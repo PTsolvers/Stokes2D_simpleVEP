@@ -26,4 +26,4 @@ The visco-elastic stress build-up benchmark captures stress build up while apply
 
 ## Extra material
 - A succinct [intro to continuum mechanics](docs/intro_continuum_mechanics.pdf) as written up by a former colleague from the Uni Lausanne
-- Some [slides](visco-elast_schmalholz_unil.pdf) from a mechanics course given in Earth sciences at Uni Lausanne by Prof. S. Schmalholz
+- Some [slides](docs/visco-elast_schmalholz_unil.pdf) from a mechanics course given in Earth sciences at Uni Lausanne by Prof. S. Schmalholz
