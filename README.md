@@ -1,4 +1,4 @@
-# Simple Stokes2D visco-elasto-plastic routines
+# Stokes2D visco-elasto-plastic (simple)
 Visco-elastic rheology for 2D Stokes solvers. Continuum mechanics.
 
 ![](docs/output_ve.png)
