@@ -8,14 +8,15 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 # 2D Stokes routine
 @views function Stokes2D_ve()
     # Physics
-    Lx, Ly  = 1.0, 1.0
+    Lx, Ly  = 10.0, 10.0
     μ0      = 1.0
-    ξ       = 10.0
+    μi      = 0.1
+    ξ       = 1.0
     G       = 1.0
-    εbg     = 1.0
+    ρg0     = 1.0
     # Numerics
-    nt      = 50
-    nx, ny  = 31, 31
+    nt      = 1
+    nx, ny  = 63, 63
     Vdmp    = 4.0
     Ptsc    = 8.0
     ε       = 1e-6
@@ -47,18 +48,16 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Mus     = μ0*ones(Dat, nx, ny)
     # Initialisation
     xc, yc  = LinRange(dx/2, Lx-dx/2, nx), LinRange(dy/2, Ly-dy/2, ny)
-    xv, yv  = LinRange(0.0, Lx, nx+1), LinRange(0.0, Ly, ny+1)
-    (Xvx,Yvx) = ([x for x=xv,y=yc], [y for x=xv,y=yc])
-    (Xvy,Yvy) = ([x for x=xc,y=yv], [y for x=xc,y=yv])
-    Vx     .=   εbg.*Xvx
-    Vy     .= .-εbg.*Yvy
+    rad          = (xc.-Lx./2).^2 .+ (yc'.-Ly./2).^2
+    Mus[rad.<1] .= μi
+    Rog[rad.<1] .= ρg0
     dtVx    = min(dx,dy)^2.0./av_xa(Mus)./4.1
     dtVy    = min(dx,dy)^2.0./av_ya(Mus)./4.1
     dtPt    = 4.1*Mus/max(nx,ny)/Ptsc
     # Time loop
-    t=0.0; evo_t=[]; evo_Txx=[]
+    err_evo1=[]; err_evo2=[]
     for it = 1:nt
-        iter=1; err=2*ε; err_evo1=[]; err_evo2=[]; 
+        iter=1; err=2*ε;
         Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=Txy
         while (err>ε && iter<=iterMax)
             # divergence - pressure
@@ -87,18 +86,16 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
                 err = maximum([norm_Rx, norm_Ry, norm_∇V])
                 push!(err_evo1, err); push!(err_evo2, itg)
                 @printf("it = %d, iter = %d, err = %1.3e norm[Rx=%1.3e, Ry=%1.3e, ∇V=%1.3e] \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V)
-            
             end
             iter+=1; global itg=iter
         end
-        t = t + dt
-        push!(evo_t, t); push!(evo_Txx, maximum(Txx))
         # Plotting
-        p1 = heatmap(xv, yc, Vx' , aspect_ratio=1, xlims=(0, Lx), ylims=(dy/2, Ly-dy/2), c=:inferno, title="Vx")
+        yv = LinRange(0, Ly, ny+1)
+        p1 = heatmap(xc, yc, Pt' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(dy/2, Ly-dy/2), c=:inferno, title="Pressure")
         p2 = heatmap(xc, yv, Vy' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="Vy")
-        p3 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
-            plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G./μ0)), linewidth=2.0) # analytica solution
-        display(plot(p1, p2, p3))
+        p3 = heatmap(xc, yc, Tyy', aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(dy/2, Ly-dy/2), c=:inferno, title="τyy")
+        p4 = plot(err_evo2, log10.(err_evo1), legend=false, xlabel="# iterations", ylabel="log10(error)", linewidth=2, markershape=:circle, markersize=3, framestyle=:box, labels="max(error)")
+        display(plot(p1, p2, p3, p4))
     end
 end
 
