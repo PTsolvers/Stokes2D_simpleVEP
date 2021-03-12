@@ -20,7 +20,7 @@ The Julia codes implementing 2D Stokes equations and visco-elastic shear rheolog
 ## Experiment results
 The rise of a buoyant and ductile inclusion generates, among others, pressure deviation from the hydrostatic gradient, vertical (y) velocity field and vertical normal stress as depicted in the following figure:
 
-![](docs/output_ve.png)
+![](docs/output_ve_grav.png)
 
 The visco-elastic stress build-up benchmark captures stress build up while applying pure shear on a homogeneous visco-elastic body. The current non-dimensional configuration is expected to reach a maximal stress level of 2.0 once the elastic build-up is completed, recovering the viscous solution. The figure depicts the horizontal and vertical velocity fields, and the stress build-up curve as function of time, matching the analytical solution (red line):
 
@@ -28,7 +28,15 @@ The visco-elastic stress build-up benchmark captures stress build up while apply
 
 🚧 Shearing a visco-elastic inclusion results to be added.
 
+![](docs/output_ve_pureshear.png)
+
 🚧 Shearing a visco-elasto-plastic inclusion results to be added.
+
+Von Mises plasticity:
+![](docs/output_ve_vm.png)
+
+Adding friction angel 👼:
+![](docs/output_ve_vm_phi.png)
 
 ## Extra material
 - A succinct [intro to continuum mechanics](docs/intro_continuum_mechanics.pdf) as written up by a former colleague from the Uni Lausanne.

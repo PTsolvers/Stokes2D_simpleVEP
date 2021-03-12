@@ -7,14 +7,15 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end])
 # 2D Stokes routine
 @views function Stokes2D_vep()
+    frict_angel = 1.0 
     # Physics
     Lx, Ly  = 1.0, 1.0
     radi    = 0.01
     tau_y   = 1.6
-    sinϕ    = 0.0*sind(30)
+    sinϕ    = sind(30)*frict_angel
     μ0      = 1.0
     G0      = 1.0
-    Gi      = G0/8.0 #/2.0 for sind(30)
+    Gi      = G0/(8.0-6.0*frict_angel)
     εbg     = 1.0
     # Numerics
     nt      = 10
