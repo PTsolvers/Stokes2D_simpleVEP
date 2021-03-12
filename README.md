@@ -26,17 +26,22 @@ The visco-elastic stress build-up benchmark captures stress build up while apply
 
 ![](docs/output_ve_bench.png)
 
-🚧 Shearing a visco-elastic inclusion results to be added.
+🚧 On-work section
+
+Shearing a visco-elastic inclusion results:
 
 ![](docs/output_ve_pureshear.png)
 
-🚧 Shearing a visco-elasto-plastic inclusion results to be added.
+Shearing a visco-elasto-plastic inclusion results.
 
-Von Mises plasticity:
+- Von Mises plasticity:
+
 ![](docs/output_ve_vm.png)
 
-Adding friction angel 👼:
+- Adding friction angel 👼:
+
 ![](docs/output_ve_vm_phi.png)
+
 
 ## Extra material
 - A succinct [intro to continuum mechanics](docs/intro_continuum_mechanics.pdf) as written up by a former colleague from the Uni Lausanne.
