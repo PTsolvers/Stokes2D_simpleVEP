@@ -157,7 +157,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
         p3 = heatmap(xc, yc, Tii' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="τii")
         p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
             plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution
-            plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0) # analytical solution
+            
             plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) # analytical solution
         display(plot(p1, p2, p3, p4))
     end
