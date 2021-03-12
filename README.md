@@ -12,8 +12,10 @@ This repository contains 2D iterative visco-elastic incompressible and single ph
 
 ## Julia codes
 The Julia codes implementing 2D Stokes equations and visco-elastic shear rheology:
-- [`Stokes2D_ve.jl`](Stokes2D_ve.jl) resolves the buoyant inclusion setup;
-- [`Stokes2D_ve_bench.jl`](Stokes2D_ve_bench.jl) captures the visco-elastic stress build-up.
+- [`Stokes2D_ve_grav.jl`](Stokes2D_ve_grav.jl) resolves a visco-elastic buoyant inclusion setup;
+- [`Stokes2D_ve_bench.jl`](Stokes2D_ve_bench.jl) captures the visco-elastic stress build-up shearing a homogenous bloc.
+- [`Stokes2D_ve_pureshear.jl`](Stokes2D_ve_pureshear.jl) captures the visco-elastic stress build-up shearing a visco-elastic inclusion.
+- [`Stokes2D_ve_vm.jl`](Stokes2D_ve_vm.jl) resolve brittle failure of a bloc containing a visco-elastic inclusion.
 
 ## Experiment results
 The rise of a buoyant and ductile inclusion generates, among others, pressure deviation from the hydrostatic gradient, vertical (y) velocity field and vertical normal stress as depicted in the following figure:
@@ -24,6 +26,10 @@ The visco-elastic stress build-up benchmark captures stress build up while apply
 
 ![](docs/output_ve_bench.png)
 
+Shearing a visco-elastic inclusion results to be added.
+
+Shearing a visco-elasto-plastic inclusion results to be added.
+
 ## Extra material
-- A succinct [intro to continuum mechanics](docs/intro_continuum_mechanics.pdf) as written up by a former colleague from the Uni Lausanne
-- Some [slides](docs/visco-elast_schmalholz_unil.pdf) from a mechanics course given in Earth sciences at Uni Lausanne by Prof. S. Schmalholz
+- A succinct [intro to continuum mechanics](docs/intro_continuum_mechanics.pdf) as written up by a former colleague from the Uni Lausanne.
+- Some [slides](docs/visco-elast_schmalholz_unil.pdf) from a mechanics course given in Earth sciences at Uni Lausanne by Prof. S. Schmalholz.
