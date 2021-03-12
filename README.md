@@ -26,7 +26,9 @@ The visco-elastic stress build-up benchmark captures stress build up while apply
 
 ![](docs/output_ve_bench.png)
 
-🚧 On-work section
+---
+
+🚧 **On-work section**
 
 Shearing a visco-elastic inclusion results:
 
