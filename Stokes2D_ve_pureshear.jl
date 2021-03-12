@@ -33,7 +33,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Vy      = zeros(Dat, nx  ,ny+1)
     Exx     = zeros(Dat, nx  ,ny  )
     Eyy     = zeros(Dat, nx  ,ny  )
-    Exy     = zeros(Dat, nx-1,ny-1)    
+    Exy     = zeros(Dat, nx-1,ny-1)
     Txx     = zeros(Dat, nx  ,ny  )
     Tyy     = zeros(Dat, nx  ,ny  )
     Txy     = zeros(Dat, nx+1,ny+1)
@@ -65,8 +65,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
-        iter=1; err=2*ε; err_evo1=[]; err_evo2=[]; 
+        iter=1; err=2*ε; err_evo1=[]; err_evo2=[];
         Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=Txy
+        local itg
         while (err>ε && iter<=iterMax)
             # divergence - pressure
             ∇V    .= diff(Vx, dims=1)./dx .+ diff(Vy, dims=2)./dy
@@ -95,9 +96,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
                 err = maximum([norm_Rx, norm_Ry, norm_∇V])
                 push!(err_evo1, err); push!(err_evo2, itg)
                 @printf("it = %d, iter = %d, err = %1.3e norm[Rx=%1.3e, Ry=%1.3e, ∇V=%1.3e] \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V)
-            
+
             end
-            iter+=1; global itg=iter
+            iter+=1; itg=iter
         end
         t = t + dt
         push!(evo_t, t); push!(evo_Txx, maximum(Txx))
@@ -107,7 +108,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
         p2 = heatmap(xc, yc, G' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="G")
         p3 = heatmap(xc, yc, Tii' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="τii")
         p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
-            plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytica solution
+        plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytica solution
         display(plot(p1, p2, p3, p4))
     end
 end
