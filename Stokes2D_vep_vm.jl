@@ -36,7 +36,6 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Vy      = zeros(Dat, nx  ,ny+1)
     Exx     = zeros(Dat, nx  ,ny  )
     Eyy     = zeros(Dat, nx  ,ny  )
-    Exy     = zeros(Dat, nx  ,ny  )
     Exyv    = zeros(Dat, nx+1,ny+1)
     Exx1    = zeros(Dat, nx  ,ny  )
     Eyy1    = zeros(Dat, nx  ,ny  )
@@ -89,9 +88,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
-        iter=1; err=2*ε; err_evo1=[]; err_evo2=[];
-        Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv
-        λ .= 0.0
+        iter=1; err=2*ε; err_evo1=[]; err_evo2=[]
+        Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv; λ.=0.0
+        local itg
         while (err>ε && iter<=iterMax)
             # divergence - pressure
             ∇V     .= diff(Vx, dims=1)./dx .+ diff(Vy, dims=2)./dy
@@ -147,7 +146,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
                 push!(err_evo1, err); push!(err_evo2, itg)
                 @printf("it = %d, iter = %d, err = %1.2e norm[Rx=%1.2e, Ry=%1.2e, ∇V=%1.2e] (Fchk=%1.2e) \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V, maximum(Fchk))
             end
-            iter+=1; global itg=iter
+            iter+=1; itg=iter
         end
         t = t + dt
         push!(evo_t, t); push!(evo_Txx, maximum(Txx))

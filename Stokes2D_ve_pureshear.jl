@@ -65,7 +65,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
-        iter=1; err=2*ε; err_evo1=[]; err_evo2=[];
+        iter=1; err=2*ε; err_evo1=[]; err_evo2=[]
         Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=Txy
         local itg
         while (err>ε && iter<=iterMax)
