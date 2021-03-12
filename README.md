@@ -1,4 +1,4 @@
-# Stokes 2D visco-elasto-plastic (simple)
+# Concise 2D visco-elasto-plastic Stokes solver
 Visco-elasto-plastic rheology for 2D Stokes solvers and continuum mechanics.
 
 ![](extras/Stokes2D_vep_vm.gif)
@@ -55,7 +55,7 @@ julia> include("Stokes2D_ve_vm.jl")
 ```
 
 ## Extra material
-The [extras](extras/) folder contains a version of the visco-elasto-plastic code running at higher resolution and producing a gif, [`Stokes2D_ve_vm_gif.jl`](Stokes2D_ve_vm_gif.jl).
+The [extras](extras/) folder contains a version of the visco-elasto-plastic code running at higher resolution and producing a gif, [`Stokes2D_ve_vm_gif.jl`](extras/Stokes2D_ve_vm_gif.jl).
 
 
 [Julia]: https://julialang.org
