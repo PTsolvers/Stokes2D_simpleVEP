@@ -18,6 +18,8 @@ The Julia codes implementing 2D Stokes equations and visco-elastic or visco-elas
 - [`Stokes2D_ve_vm.jl`](Stokes2D_ve_vm.jl) resolve brittle failure of a bloc containing a visco-elastic inclusion. The `do_fric` switch enable taking friction angle into account (3).
 
 ## Experiment results
+
+### Visco-elasticity
 The rise of a buoyant and ductile inclusion generates, among others, pressure deviation from the hydrostatic gradient, vertical (y) velocity field and vertical normal stress as depicted in the following figure:
 
 ![](docs/output_ve_grav.png)
@@ -30,7 +32,9 @@ Repeating the previous experiment adding an elastically weaker inclusion leads t
 
 ![](docs/output_ve_pureshear.png)
 
-🎉 Adding an yielding criterion `τ_y` permits to capture brittle or plastic failure of the sample. Minor modification of the solving algorithm are needed to compute the appropriate correction in the predicted stresses to verify the yield function. A shear stress-dependant only yield function leads to Von Mises plasticity:
+### Visco-elasto-plasticity 🎉
+
+Adding an yielding criterion `τ_y` permits to capture brittle or plastic failure of the sample. Minor modification of the solving algorithm are needed to compute the appropriate correction in the predicted stresses to verify the yield function. A shear stress-dependant only yield function leads to Von Mises plasticity:
 
 ![](docs/output_ve_vm.png)
 
