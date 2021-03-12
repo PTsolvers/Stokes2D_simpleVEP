@@ -8,6 +8,7 @@ This repository contains concise [Julia] 2D iterative visco-elasto-plastic incom
 ## Content
 * [Julia Codes](#julia-codes)
 * [Experiment results](#experiment-results)
+* [Running the codes](#running-the-codes)
 * [Extra material](#extra-material)
 
 ## Julia codes
@@ -33,7 +34,6 @@ Repeating the previous experiment adding an elastically weaker inclusion leads t
 ![](docs/output_ve_pureshear.png)
 
 ### Visco-elasto-plasticity 🎉
-
 Adding an yielding criterion `τ_y` permits to capture brittle or plastic failure of the sample. Minor modification of the solving algorithm are needed to compute the appropriate correction in the predicted stresses to verify the yield function. A shear stress-dependant only yield function leads to Von Mises plasticity:
 
 ![](docs/output_ve_vm.png)
@@ -42,9 +42,20 @@ Adding a friction angle (or angel 👼) term `Pt*sin(ϕ)` to the yield function 
 
 ![](docs/output_ve_vm_phi.png)
 
+
+## Running the codes
+To execute the Julia scripts, clone or copy the current repository. Navigate to the repo's root and launch [Julia] with the `--project` flag. From within the Julia REPL, add the project packages by running `instantiate`. Then to execute the Julia scripts from within the REPL you can run `<my_script.jl>` by typing `include("<my_script.jl>")`:
+```julia-repl
+julia> ]
+
+(Stokes2D_simpleVEP) pkg> instantiate
+
+julia> include("Stokes2D_ve_vm.jl")
+
+```
+
 ## Extra material
-- A succinct [intro to continuum mechanics](docs/intro_continuum_mechanics.pdf) as written up by a former colleague from the Uni Lausanne.
-- Some [slides](docs/visco-elast_schmalholz_unil.pdf) from a mechanics course given in Earth sciences at Uni Lausanne by Prof. S. Schmalholz.
+The [extras](extras/) folder contains a version of the visco-elasto-plastic code running at higher resolution and producing a gif, [`Stokes2D_ve_vm_gif.jl`](Stokes2D_ve_vm_gif.jl).
 
 
 [Julia]: https://julialang.org
