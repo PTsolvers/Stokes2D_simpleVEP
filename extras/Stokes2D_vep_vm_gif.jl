@@ -18,14 +18,14 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Gi      = G0/(8.0-6.0*do_fric)
     εbg     = 1.0
     # Numerics
-    nt      = 10
-    nx, ny  = 31, 31
+    nt      = 12
+    nx, ny  = 63, 63
     Vdmp    = 4.0
     Vsc     = 4.0
     Ptsc    = 8.0
     ε       = 1e-6
-    iterMax = 1e4
-    nout    = 200
+    iterMax = 5e4
+    nout    = 500
     # Preprocessing
     dx, dy  = Lx/nx, Ly/ny
     dt      = μ0/G0/4.0 # assumes Maxwell time of 4
@@ -85,6 +85,8 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     η_ve   .= (1.0./η_e + 1.0./η_v).^-1
     Vx     .=   εbg.*Xvx
     Vy     .= .-εbg.*Yvy
+    dname = "viz_out"; ENV["GKSwstype"]="nul"; if isdir("$dname")==false mkdir("$dname") end; loadpath = "./$dname/"; anim = Animation(loadpath,String[])
+    println("Animation directory: $(anim.dir)")
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
@@ -159,8 +161,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution
             plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0) # analytical solution
             plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) # analytical solution
-        display(plot(p1, p2, p3, p4))
+        display(plot(p1, p2, p3, p4)); frame(anim)
     end
+    gif(anim, "Stokes2D_vep_vm.gif", fps = 3)
 end
 
 Stokes2D_vep()

@@ -1,9 +1,9 @@
 # Stokes2D visco-elasto-plastic (simple)
-Visco-elastic rheology for 2D Stokes solvers and continuum mechanics.
+Visco-elasto-plastic rheology for 2D Stokes solvers and continuum mechanics.
 
-![](docs/output_ve.png)
+![](extras/Stokes2D_vep_vm.gif)
 
-This repository contains 2D iterative visco-elastic incompressible and single phase Stokes solvers to (1) resolve pressure, velocity and visco-elastic stress distribution around a buoyant ductile spherical inclusion and (2) capture the visco-elastic stress build-up in a homogeneous sample.
+This repository contains concise [Julia] 2D iterative visco-elasto-plastic incompressible and single phase Stokes solvers to (1) resolve pressure, velocity and visco-elastic stress distribution around a buoyant ductile spherical inclusion, (2) capture the visco-elastic stress build-up in a homogeneous or inclusion sample and (3) adding yielding of the visco-elastic material to resolve visco-elasto-plastic rheology.
 
 ## Content
 * [Julia Codes](#julia-codes)
@@ -11,11 +11,11 @@ This repository contains 2D iterative visco-elastic incompressible and single ph
 * [Extra material](#extra-material)
 
 ## Julia codes
-The Julia codes implementing 2D Stokes equations and visco-elastic shear rheology:
-- [`Stokes2D_ve_grav.jl`](Stokes2D_ve_grav.jl) resolves a visco-elastic buoyant inclusion setup;
-- [`Stokes2D_ve_bench.jl`](Stokes2D_ve_bench.jl) captures the visco-elastic stress build-up shearing a homogenous bloc.
-- [`Stokes2D_ve_pureshear.jl`](Stokes2D_ve_pureshear.jl) captures the visco-elastic stress build-up shearing a visco-elastic inclusion.
-- [`Stokes2D_ve_vm.jl`](Stokes2D_ve_vm.jl) resolve brittle failure of a bloc containing a visco-elastic inclusion.
+The Julia codes implementing 2D Stokes equations and visco-elastic or visco-elasto-plastic shear rheology:
+- [`Stokes2D_ve_grav.jl`](Stokes2D_ve_grav.jl) resolves a visco-elastic buoyant inclusion setup (1);
+- [`Stokes2D_ve_bench.jl`](Stokes2D_ve_bench.jl) captures the visco-elastic stress build-up shearing a homogenous bloc (2);
+- [`Stokes2D_ve_pureshear.jl`](Stokes2D_ve_pureshear.jl) captures the visco-elastic stress build-up shearing a visco-elastic inclusion (2);
+- [`Stokes2D_ve_vm.jl`](Stokes2D_ve_vm.jl) resolve brittle failure of a bloc containing a visco-elastic inclusion. The `do_fric` switch enable taking friction angle into account (3).
 
 ## Experiment results
 The rise of a buoyant and ductile inclusion generates, among others, pressure deviation from the hydrostatic gradient, vertical (y) velocity field and vertical normal stress as depicted in the following figure:
@@ -26,25 +26,21 @@ The visco-elastic stress build-up benchmark captures stress build up while apply
 
 ![](docs/output_ve_bench.png)
 
----
-
-🚧 **On-work section**
-
-Shearing a visco-elastic inclusion results:
+Repeating the previous experiment adding an elastically weaker inclusion leads to similar results:
 
 ![](docs/output_ve_pureshear.png)
 
-Shearing a visco-elasto-plastic inclusion results.
-
-- Von Mises plasticity:
+🎉 Adding an yielding criterion `τ_y` permits to capture brittle or plastic failure of the sample. Minor modification of the solving algorithm are needed to compute the appropriate correction in the predicted stresses to verify the yield function. A shear stress-dependant only yield function leads to Von Mises plasticity:
 
 ![](docs/output_ve_vm.png)
 
-- Adding friction angel 👼:
+Adding a friction angle (or angel 👼) term `Pt*sin(ϕ)` to the yield function permits to control shear-band orientation and relates to observations from failure patterns in many geo-materials:
 
 ![](docs/output_ve_vm_phi.png)
-
 
 ## Extra material
 - A succinct [intro to continuum mechanics](docs/intro_continuum_mechanics.pdf) as written up by a former colleague from the Uni Lausanne.
 - Some [slides](docs/visco-elast_schmalholz_unil.pdf) from a mechanics course given in Earth sciences at Uni Lausanne by Prof. S. Schmalholz.
+
+
+[Julia]: https://julialang.org
