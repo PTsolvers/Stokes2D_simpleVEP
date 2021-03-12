@@ -1,5 +1,5 @@
 # Stokes2D visco-elasto-plastic (simple)
-Visco-elastic rheology for 2D Stokes solvers. Continuum mechanics.
+Visco-elastic rheology for 2D Stokes solvers and continuum mechanics.
 
 ![](docs/output_ve.png)
 
@@ -26,9 +26,9 @@ The visco-elastic stress build-up benchmark captures stress build up while apply
 
 ![](docs/output_ve_bench.png)
 
-Shearing a visco-elastic inclusion results to be added.
+🚧 Shearing a visco-elastic inclusion results to be added.
 
-Shearing a visco-elasto-plastic inclusion results to be added.
+🚧 Shearing a visco-elasto-plastic inclusion results to be added.
 
 ## Extra material
 - A succinct [intro to continuum mechanics](docs/intro_continuum_mechanics.pdf) as written up by a former colleague from the Uni Lausanne.
