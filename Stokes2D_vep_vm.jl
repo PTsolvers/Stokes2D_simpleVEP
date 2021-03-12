@@ -11,15 +11,16 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Lx, Ly  = 1.0, 1.0
     radi    = 0.01
     tau_y   = 1.6
+    sinϕ    = 0.0*sind(30)
     μ0      = 1.0
     G0      = 1.0
-    Gi      = G0/2.0
+    Gi      = G0/8.0 #/2.0 for sind(30)
     εbg     = 1.0
     # Numerics
     nt      = 10
     nx, ny  = 31, 31
     Vdmp    = 4.0
-    Vsc     = 1.0
+    Vsc     = 4.0
     Ptsc    = 8.0
     ε       = 1e-6
     iterMax = 1e4
@@ -87,7 +88,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
-        iter=1; err=2*ε; err_evo1=[]; err_evo2=[]; 
+        iter=1; err=2*ε; err_evo1=[]; err_evo2=[];
         Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv
         λ .= 0.0
         while (err>ε && iter<=iterMax)
@@ -110,7 +111,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             Txy    .= 2.0.*η_ve.*Exy1
             Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
             # yield function
-            F      .= Tii .- tau_y
+            F      .= Tii .- tau_y .- Pt.*sinϕ
             Pla    .= 0.0
             Pla    .= F .> 0.0
             λ      .= Pla.*F./η_ve
@@ -122,7 +123,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             Tyy    .= 2.0.*η_ve.*(Eyy1 -     λ.*dQdTyy)
             Txy    .= 2.0.*η_ve.*(Exy1 - 0.5*λ.*dQdTxy)
             Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
-            Fchk   .= Tii .- tau_y
+            Fchk   .= Tii .- tau_y .- Pt.*sinϕ
             η_vep  .= Tii./2.0./Eii
             η_vepv[2:end-1,2:end-1] .= av(η_vep); η_vepv[1,:].=η_vepv[2,:]; η_vepv[end,:].=η_vepv[end-1,:]; η_vepv[:,1].=η_vepv[:,2]; η_vepv[:,end].=η_vepv[:,end-1]
             Txyv   .= 2.0.*η_vepv.*Exyv1
@@ -155,7 +156,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
         p2 = heatmap(xc, yc, η_vep' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="η_vep")
         p3 = heatmap(xc, yc, Tii' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="τii")
         p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
-            plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytica solution
+            plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution
+            plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0) # analytical solution
+            plot!(evo_t, tau_y*ones(size(evo_t)), linewidth=2.0) # analytical solution
         display(plot(p1, p2, p3, p4))
     end
 end
