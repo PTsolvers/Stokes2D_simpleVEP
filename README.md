@@ -50,7 +50,7 @@ julia> ]
 
 (Stokes2D_simpleVEP) pkg> instantiate
 
-julia> include("Stokes2D_ve_vm.jl")
+julia> include("Stokes2D_vep.jl")
 ```
 
 ## Extra material
