@@ -1,7 +1,7 @@
 # Stokes2D visco-elasto-plastic (simple)
 Visco-elastic rheology for 2D Stokes solvers and continuum mechanics.
 
-![](docs/output_ve.png)
+![](docs/output_ve_vm_phi.png)
 
 This repository contains 2D iterative visco-elastic incompressible and single phase Stokes solvers to (1) resolve pressure, velocity and visco-elastic stress distribution around a buoyant ductile spherical inclusion and (2) capture the visco-elastic stress build-up in a homogeneous sample.
 
