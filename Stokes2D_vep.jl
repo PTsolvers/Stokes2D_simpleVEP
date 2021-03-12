@@ -7,15 +7,15 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end])
 # 2D Stokes routine
 @views function Stokes2D_vep()
-    do_fric = false
+    do_DP   = false  # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     # Physics
     Lx, Ly  = 1.0, 1.0
     radi    = 0.01
     τ_y     = 1.6
-    sinϕ    = sind(30)*do_fric
+    sinϕ    = sind(30)*do_DP
     μ0      = 1.0
     G0      = 1.0
-    Gi      = G0/(8.0-6.0*do_fric)
+    Gi      = G0/(8.0-6.0*do_DP)
     εbg     = 1.0
     # Numerics
     nt      = 10
@@ -158,9 +158,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
         p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
             plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution for VE loading
             plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0)            # viscous flow stress
-            if do_fric == false
-                plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0)                  # von Mises yield stress
-            end
+            if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
         display(plot(p1, p2, p3, p4))
     end
 end
