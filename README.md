@@ -44,7 +44,7 @@ Adding a friction angle (or angel 👼) term `Pt*sin(ϕ)` to the yield function 
 
 
 ## Running the codes
-To execute the Julia scripts, clone or copy the current repository. Navigate to the repo's root and launch [Julia] with the `--project` flag. From within the Julia REPL, add the project packages by running `instantiate`. Then to execute the Julia scripts from within the REPL you can run `<my_script.jl>` by typing `include("<my_script.jl>")`:
+To execute the Julia scripts, clone or copy the current repository and launch [Julia] with the `--project` flag. From within the Julia REPL, add the project packages by running `instantiate`. Then execute the Julia scripts `<my_script.jl>` from within the REPL type `include("<my_script.jl>")`:
 ```julia-repl
 julia> ]
 
