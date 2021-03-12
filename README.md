@@ -34,11 +34,11 @@ Repeating the previous experiment adding an elastically weaker inclusion leads t
 ![](docs/output_ve_pureshear.png)
 
 ### Visco-elasto-plasticity 🎉
-Adding an yielding criterion `τ_y` permits to capture brittle or plastic failure of the sample. Minor modification of the solving algorithm are needed to compute the appropriate correction in the predicted stresses to verify the yield function. A shear stress-dependant only yield function leads to Von Mises plasticity. The red, green and purple lines represent the visco-elastic stress build-up, the viscous flow stress and the Von Mises yield stress, respectively:
+**Von Mises** Adding an yielding criterion `τ_y` permits to capture brittle or plastic failure of the sample. Minor modification of the solving algorithm are needed to compute the appropriate correction in the predicted stresses to verify the yield function. A shear stress-dependant only yield function leads to Von Mises plasticity. The red, green and purple lines represent the visco-elastic stress build-up, the viscous flow stress and the Von Mises yield stress, respectively:
 
 ![](docs/output_vep_vm.png)
 
-Adding a friction angle (or angel 👼) term `Pt*sin(ϕ)` to the yield function permits to control shear-band orientation and relates to observations from failure patterns in many geo-materials using a Drucker-Prager plasticity model. The red and green lines represent the visco-elastic stress build-up and the viscous flow stress, respectively:
+**Drucker-Prager** Adding a friction angle (or angel 👼) term `Pt*sin(ϕ)` to the yield function permits to control shear-band orientation and relates to observations from failure patterns in many geo-materials using a Drucker-Prager plasticity model. The red and green lines represent the visco-elastic stress build-up and the viscous flow stress, respectively:
 
 ![](docs/output_vep_dp.png)
 
@@ -51,7 +51,6 @@ julia> ]
 (Stokes2D_simpleVEP) pkg> instantiate
 
 julia> include("Stokes2D_ve_vm.jl")
-
 ```
 
 ## Extra material
