@@ -47,10 +47,10 @@ Repeating the previous experiment adding an elastically weaker inclusion leads t
 #### Regularisation
 **Drucker-Prager |** Adding a viscous regularisation term in parallel to the plastic element \[[1]\] permits to control the shear band width and makes the results resolution independent while stabilising the algorithm.
 
-Results on a numerical grid resolution of 63x63 grid points:
+- Results on a numerical grid resolution of 63x63 grid points:
 ![](docs/output_vep_dp_reg_63x63.png)
 
-Results on a numerical resolution of 127x127 grid points:
+- Results on a numerical resolution of 127x127 grid points:
 ![](docs/output_vep_dp_reg_127x127.png)
 
 
