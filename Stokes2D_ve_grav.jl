@@ -8,20 +8,20 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 # 2D Stokes routine
 @views function Stokes2D_ve()
     # Physics
-    Lx, Ly  = 10.0, 10.0
-    μ0      = 1.0
-    μi      = 0.1
-    ξ       = 1.0
-    G       = 1.0
-    ρg0     = 1.0
+    Lx, Ly  = 10.0, 10.0  # domain size
+    ξ       = 1.0         # Maxwell relaxation time
+    μ0      = 1.0         # viscous viscosity
+    μi      = 0.1         # viscous viscosity perturbation
+    G       = 1.0         # elastic shear modulus
+    ρg0     = 1.0         # density*gravity
     # Numerics
-    nt      = 1
-    nx, ny  = 63, 63
-    Vdmp    = 4.0
-    Ptsc    = 8.0
-    ε       = 1e-6
-    iterMax = 1e5
-    nout    = 200
+    nt      = 1           # number of time steps
+    nx, ny  = 63, 63      # numerical grid resolution
+    Vdmp    = 4.0         # convergence acceleration (damping)
+    Ptsc    = 8.0         # iterative time step limiter
+    ε       = 1e-6        # nonlinear tolerence
+    iterMax = 1e5         # max number of iters
+    nout    = 200         # check frequency
     # Preprocessing
     dx, dy  = Lx/nx, Ly/ny
     dt      = μ0/(G*ξ + 1e-15)

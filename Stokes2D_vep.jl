@@ -7,25 +7,25 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end])
 # 2D Stokes routine
 @views function Stokes2D_vep()
-    do_DP   = false  # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
+    do_DP   = false              # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     # Physics
-    Lx, Ly  = 1.0, 1.0
-    radi    = 0.01
-    τ_y     = 1.6
-    sinϕ    = sind(30)*do_DP
-    μ0      = 1.0
-    G0      = 1.0
-    Gi      = G0/(8.0-6.0*do_DP)
-    εbg     = 1.0
+    Lx, Ly  = 1.0, 1.0           # domain size
+    radi    = 0.01               # inclusion radius
+    τ_y     = 1.6                # yield stress. If do_DP=true, τ_y stand for the cohesion: c*cos(ϕ)
+    sinϕ    = sind(30)*do_DP     # sinus of the friction angle
+    μ0      = 1.0                # viscous viscosity
+    G0      = 1.0                # elastic shear modulus
+    Gi      = G0/(8.0-6.0*do_DP) # elastic shear modulus perturbation
+    εbg     = 1.0                # background strain-rate
     # Numerics
-    nt      = 10
-    nx, ny  = 31, 31
-    Vdmp    = 4.0
-    Vsc     = 4.0
-    Ptsc    = 8.0
-    ε       = 1e-6
-    iterMax = 1e4
-    nout    = 200
+    nt      = 10                 # number of time steps
+    nx, ny  = 31, 31             # numerical grid resolution
+    Vdmp    = 4.0                # convergence acceleration (damping)
+    Vsc     = 4.0                # iterative time step limiter
+    Ptsc    = 8.0                # iterative time step limiter
+    ε       = 1e-6               # nonlinear tolerence
+    iterMax = 1e4                # max number of iters
+    nout    = 200                # check frequency
     # Preprocessing
     dx, dy  = Lx/nx, Ly/ny
     dt      = μ0/G0/4.0 # assumes Maxwell time of 4
