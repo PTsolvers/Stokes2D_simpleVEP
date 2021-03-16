@@ -8,7 +8,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 # 2D Stokes routine
 @views function Stokes2D_vep()
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
-    η_reg   = 1.2e-2             # regularisation "visosity"
+    η_reg   = 1.2e-2             # regularisation "viscosity"
     # Physics
     Lx, Ly  = 1.0, 1.0           # domain size
     radi    = 0.01               # inclusion radius
