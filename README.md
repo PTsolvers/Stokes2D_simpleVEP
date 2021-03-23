@@ -19,6 +19,7 @@ The Julia codes implementing 2D Stokes equations and visco-elastic or visco-elas
 - [`Stokes2D_ve_pureshear.jl`](Stokes2D_ve_pureshear.jl) captures the visco-elastic stress build-up shearing a visco-elastic inclusion (2);
 - [`Stokes2D_vep.jl`](Stokes2D_vep.jl) resolve brittle failure of a bloc containing a visco-elastic inclusion. The `do_DP` switch enable taking friction angle into account (Drucker-Prager instead of Von Mises) (3).
 - [`Stokes2D_vep_reg.jl`](Stokes2D_vep_reg.jl) resolve regularised brittle failure of a bloc containing a visco-elastic inclusion. The `do_DP` switch enable taking friction angle into account (Drucker-Prager instead of Von Mises) (3) and the `η_reg` switch sets the regularisation length scale \[[1]\].
+- [`Stokes2D_vep_reg_vc.jl`](Stokes2D_vep_reg_vc.jl) is a version of the [`Stokes2D_vep_reg.jl`](Stokes2D_vep_reg.jl) implementation performing the plastic correction on both vertices and centres (vc) on the staggered grid.
 
 ## Experiment results
 
@@ -53,6 +54,14 @@ Repeating the previous experiment adding an elastically weaker inclusion leads t
 - Results on a numerical resolution of 127x127 grid points:
 ![](docs/output_vep_dp_reg_127x127.png)
 
+#### Vertices and centres formulation
+The following results, to be compared to those in the [previous section](#regularisation), are obtained using a vertices and centres formulation of the plastic corrections. The results show comparable patterns:
+
+- Results on a numerical grid resolution of 63x63 grid points:
+![](docs/output_vep_dp_reg_vc_63x63.png)
+
+- Results on a numerical resolution of 127x127 grid points:
+![](docs/output_vep_dp_reg_vc_127x127.png)
 
 ## Running the codes
 To execute the Julia scripts, clone or copy the current repository and launch [Julia] with the `--project` flag. From within the Julia REPL, add the project packages by running `instantiate`. Then execute the Julia scripts `<my_script.jl>` from within the REPL type `include("<my_script.jl>")`:
