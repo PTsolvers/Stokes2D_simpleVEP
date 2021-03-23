@@ -7,25 +7,25 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end])
 # 2D Stokes routine
 @views function Stokes2D_vep()
-    do_DP   = false              # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
+    do_DP   = true  # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     # Physics
-    Lx, Ly  = 1.0, 1.0           # domain size
-    radi    = 0.01               # inclusion radius
-    τ_y     = 1.6                # yield stress. If do_DP=true, τ_y stand for the cohesion: c*cos(ϕ)
-    sinϕ    = sind(30)*do_DP     # sinus of the friction angle
-    μ0      = 1.0                # viscous viscosity
-    G0      = 1.0                # elastic shear modulus
-    Gi      = G0/(8.0-6.0*do_DP) # elastic shear modulus perturbation
-    εbg     = 1.0                # background strain-rate
+    Lx, Ly  = 1.0, 1.0
+    radi    = 0.01
+    τ_y     = 1.6
+    sinϕ    = sind(30)*do_DP
+    μ0      = 1.0
+    G0      = 1.0
+    Gi      = G0/(8.0-6.0*do_DP)
+    εbg     = 1.0
     # Numerics
-    nt      = 10                 # number of time steps
-    nx, ny  = 31, 31             # numerical grid resolution
-    Vdmp    = 4.0                # convergence acceleration (damping)
-    Vsc     = 4.0                # iterative time step limiter
-    Ptsc    = 8.0                # iterative time step limiter
-    ε       = 1e-6               # nonlinear tolerence
-    iterMax = 1e4                # max number of iters
-    nout    = 200                # check frequency
+    nt      = 12
+    nx, ny  = 63, 63
+    Vdmp    = 4.0
+    Vsc     = 4.0
+    Ptsc    = 8.0
+    ε       = 1e-6
+    iterMax = 5e4
+    nout    = 500
     # Preprocessing
     dx, dy  = Lx/nx, Ly/ny
     dt      = μ0/G0/4.0 # assumes Maxwell time of 4
@@ -85,6 +85,8 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     η_ve   .= (1.0./η_e + 1.0./η_v).^-1
     Vx     .=   εbg.*Xvx
     Vy     .= .-εbg.*Yvy
+    dname = "viz_out"; ENV["GKSwstype"]="nul"; if isdir("$dname")==false mkdir("$dname") end; loadpath = "./$dname/"; anim = Animation(loadpath,String[])
+    println("Animation directory: $(anim.dir)")
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
@@ -159,8 +161,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution for VE loading
             plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0)            # viscous flow stress
             if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
-        display(plot(p1, p2, p3, p4))
+        plot(p1, p2, p3, p4); frame(anim)
     end
+    gif(anim, "Stokes2D_vep.gif", fps = 3)
 end
 
 Stokes2D_vep()

@@ -7,25 +7,26 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end])
 # 2D Stokes routine
 @views function Stokes2D_vep()
-    do_fric = true
+    do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
+    η_reg   = 1.2e-2             # regularisation "viscosity"
     # Physics
-    Lx, Ly  = 1.0, 1.0
-    radi    = 0.01
-    τ_y     = 1.6
-    sinϕ    = sind(30)*do_fric
-    μ0      = 1.0
-    G0      = 1.0
-    Gi      = G0/(8.0-6.0*do_fric)
-    εbg     = 1.0
+    Lx, Ly  = 1.0, 1.0           # domain size
+    radi    = 0.01               # inclusion radius
+    τ_y     = 1.6                # yield stress. If do_DP=true, τ_y stand for the cohesion: c*cos(ϕ)
+    sinϕ    = sind(30)*do_DP     # sinus of the friction angle
+    μ0      = 1.0                # viscous viscosity
+    G0      = 1.0                # elastic shear modulus
+    Gi      = G0/(6.0-4.0*do_DP) # elastic shear modulus perturbation
+    εbg     = 1.0                # background strain-rate
     # Numerics
-    nt      = 12
-    nx, ny  = 63, 63
-    Vdmp    = 4.0
-    Vsc     = 4.0
-    Ptsc    = 8.0
-    ε       = 1e-6
-    iterMax = 5e4
-    nout    = 500
+    nt      = 10                 # number of time steps
+    nx, ny  = 63, 63             # numerical grid resolution
+    Vdmp    = 4.0                # convergence acceleration (damping)
+    Vsc     = 2.0                # iterative time step limiter
+    Ptsc    = 6.0                # iterative time step limiter
+    ε       = 1e-6               # nonlinear tolerence
+    iterMax = 3e4                # max number of iters
+    nout    = 200                # check frequency
     # Preprocessing
     dx, dy  = Lx/nx, Ly/ny
     dt      = μ0/G0/4.0 # assumes Maxwell time of 4
@@ -85,8 +86,6 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     η_ve   .= (1.0./η_e + 1.0./η_v).^-1
     Vx     .=   εbg.*Xvx
     Vy     .= .-εbg.*Yvy
-    dname = "viz_out"; ENV["GKSwstype"]="nul"; if isdir("$dname")==false mkdir("$dname") end; loadpath = "./$dname/"; anim = Animation(loadpath,String[])
-    println("Animation directory: $(anim.dir)")
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
@@ -116,7 +115,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             F      .= Tii .- τ_y .- Pt.*sinϕ
             Pla    .= 0.0
             Pla    .= F .> 0.0
-            λ      .= Pla.*F./η_ve
+            λ      .= Pla.*F./(η_ve .+ η_reg)
             dQdTxx .= 0.5.*Txx./Tii
             dQdTyy .= 0.5.*Tyy./Tii
             dQdTxy .=      Txy./Tii
@@ -125,7 +124,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             Tyy    .= 2.0.*η_ve.*(Eyy1 -     λ.*dQdTyy)
             Txy    .= 2.0.*η_ve.*(Exy1 - 0.5*λ.*dQdTxy)
             Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
-            Fchk   .= Tii .- τ_y .- Pt.*sinϕ
+            Fchk   .= Tii .- τ_y .- Pt.*sinϕ .- λ.*η_reg
             η_vep  .= Tii./2.0./Eii
             η_vepv[2:end-1,2:end-1] .= av(η_vep); η_vepv[1,:].=η_vepv[2,:]; η_vepv[end,:].=η_vepv[end-1,:]; η_vepv[:,1].=η_vepv[:,2]; η_vepv[:,end].=η_vepv[:,end-1]
             Txyv   .= 2.0.*η_vepv.*Exyv1
@@ -158,12 +157,11 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
         p2 = heatmap(xc, yc, η_vep' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="η_vep")
         p3 = heatmap(xc, yc, Tii' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="τii")
         p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
-            plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution
-            plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0) # analytical solution
-            plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) # analytical solution
-        display(plot(p1, p2, p3, p4)); frame(anim)
+            plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution for VE loading
+            plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0)            # viscous flow stress
+            if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
+        display(plot(p1, p2, p3, p4))
     end
-    gif(anim, "Stokes2D_vep_vm.gif", fps = 3)
 end
 
 Stokes2D_vep()
