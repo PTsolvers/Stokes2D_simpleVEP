@@ -3,12 +3,15 @@ Visco-elasto-plastic rheology for 2D Stokes solvers and continuum mechanics.
 
 ![](extras/Stokes2D_vep.gif)
 
-This repository contains concise [Julia] 2D iterative visco-elasto-plastic incompressible and single phase Stokes solvers to (1) resolve pressure, velocity and visco-elastic stress distribution around a buoyant ductile spherical inclusion, (2) capture the visco-elastic stress build-up in a homogeneous or inclusion sample and (3) adding yielding of the visco-elastic material to resolve visco-elasto-plastic rheology (Von Mises and Drucker-Prager).
+This repository contains concise [Julia] 2D iterative visco-elasto-plastic (VEP) incompressible and single phase Stokes solvers to (1) resolve pressure, velocity and visco-elastic stress distribution around a buoyant ductile spherical inclusion, (2) capture the visco-elastic stress build-up in a homogeneous or inclusion sample and (3) adding yielding of the visco-elastic material to resolve visco-elasto-plastic rheology (Von Mises and Drucker-Prager).
+
+⚠️ **Work in progress:** The current codes rely on a centres implementation of the VEP rheology (staggered grid). Pure shear configuration results are accurate ([more here](#vertices-centres-formulation)) but simple shear experiments fail to localise compared to vertices only or vertices and centres formulations. More details in the [wip_codes](wip_codes/) folder.
 
 ## Content
 * [Julia Codes](#julia-codes)
 * [Experiment results](#experiment-results)
 * [Running the codes](#running-the-codes)
+* [Vertices-Centres formulation](#vertices-centres-formulation)
 * [Extra material](#extra-material)
 * [References](#references)
 
@@ -54,7 +57,7 @@ Repeating the previous experiment adding an elastically weaker inclusion leads t
 - Results on a numerical resolution of 127x127 grid points:
 ![](docs/output_vep_dp_reg_127x127.png)
 
-#### Vertices and centres formulation
+## Vertices-Centres formulation
 The following results, to be compared to those in the [previous section](#regularisation), are obtained using a vertices and centres formulation of the plastic corrections. The results show comparable patterns:
 
 - Results on a numerical grid resolution of 63x63 grid points:
@@ -62,6 +65,8 @@ The following results, to be compared to those in the [previous section](#regula
 
 - Results on a numerical resolution of 127x127 grid points:
 ![](docs/output_vep_dp_reg_vc_127x127.png)
+
+⚠️ **Work in progress:** Simple shear experiments fail to localise in centres only formulation compared to vertices only or vertices and centres formulations. More details in the [wip_codes](wip_codes/) folder.
 
 ## Running the codes
 To execute the Julia scripts, clone or copy the current repository and launch [Julia] with the `--project` flag. From within the Julia REPL, add the project packages by running `instantiate`. Then execute the Julia scripts `<my_script.jl>` from within the REPL type `include("<my_script.jl>")`:

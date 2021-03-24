@@ -19,7 +19,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Gi      = G0/(6.0-4.0*do_DP) # elastic shear modulus perturbation
     εbg     = 1.0                # background strain-rate
     # Numerics
-    nt      = 10                 # number of time steps
+    nt      = 20                 # number of time steps
     nx, ny  = 63, 63             # numerical grid resolution
     Vdmp    = 4.0                # convergence acceleration (damping)
     Vsc     = 2.0                # iterative time step limiter
@@ -35,6 +35,8 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     ∇V      = zeros(Dat, nx  ,ny  )
     Vx      = zeros(Dat, nx+1,ny  )
     Vy      = zeros(Dat, nx  ,ny+1)
+    Vxe     = zeros(Dat, nx+1,ny+2)
+    Vye     = zeros(Dat, nx+2,ny+1)
     Exx     = zeros(Dat, nx  ,ny  )
     Eyy     = zeros(Dat, nx  ,ny  )
     Exyv    = zeros(Dat, nx+1,ny+1)
@@ -50,26 +52,6 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Tyy_o   = zeros(Dat, nx  ,ny  )
     Txy_o   = zeros(Dat, nx  ,ny  )
     Txyv_o  = zeros(Dat, nx+1,ny+1)
-    # for vertices implementation
-    Ptv     = zeros(Dat, nx+1,ny+1)
-    Exxv    = zeros(Dat, nx+1,ny+1)
-    Eyyv    = zeros(Dat, nx+1,ny+1)
-    Exxv1   = zeros(Dat, nx+1,ny+1)
-    Eyyv1   = zeros(Dat, nx+1,ny+1)
-    Txxv    = zeros(Dat, nx+1,ny+1)
-    Tyyv    = zeros(Dat, nx+1,ny+1)
-    Txxv_o  = zeros(Dat, nx+1,ny+1)
-    Tyyv_o  = zeros(Dat, nx+1,ny+1)
-    Fchkv   = zeros(Dat, nx+1,ny+1)
-    Fv      = zeros(Dat, nx+1,ny+1)
-    Plav    = zeros(Dat, nx+1,ny+1)
-    λv      = zeros(Dat, nx+1,ny+1)
-    dQdTxxv = zeros(Dat, nx+1,ny+1)
-    dQdTyyv = zeros(Dat, nx+1,ny+1)
-    dQdTxyv = zeros(Dat, nx+1,ny+1)
-    Tiiv    = zeros(Dat, nx+1,ny+1)
-    Eiiv    = zeros(Dat, nx+1,ny+1)
-    # for vertices implementation
     Tii     = zeros(Dat, nx  ,ny  )
     Eii     = zeros(Dat, nx  ,ny  )
     F       = zeros(Dat, nx  ,ny  )
@@ -87,14 +69,12 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     dtVx    = zeros(Dat, nx-1,ny  )
     dtVy    = zeros(Dat, nx  ,ny-1)
     Rog     = zeros(Dat, nx  ,ny  )
-    η_v     =    μ0*ones(Dat, nx  ,ny  )
-    η_e     = dt*G0*ones(Dat, nx  ,ny  )
-    η_ev    = dt*G0*ones(Dat, nx+1,ny+1)
-    η_ve    =       ones(Dat, nx  ,ny  )
-    η_vep   =       ones(Dat, nx  ,ny  )
-    η_vepv  =       ones(Dat, nx+1,ny+1)
-    η_vev   =       ones(Dat, nx+1,ny+1) # for vertices implementation
-    η_vv    =    μ0*ones(Dat, nx+1,ny+1) # for vertices implementation
+    η_v     =    μ0*ones(Dat, nx, ny)
+    η_e     = dt*G0*ones(Dat, nx, ny)
+    η_ev    = dt*G0*ones(Dat, nx+1, ny+1)
+    η_ve    =       ones(Dat, nx, ny)
+    η_vep   =       ones(Dat, nx, ny)
+    η_vepv  =       ones(Dat, nx+1, ny+1)
     # Initial condition
     xc, yc  = LinRange(dx/2, Lx-dx/2, nx), LinRange(dy/2, Ly-dy/2, ny)
     xc, yc  = LinRange(dx/2, Lx-dx/2, nx), LinRange(dy/2, Ly-dy/2, ny)
@@ -105,16 +85,16 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     radv      = (xv.-Lx./2).^2 .+ (yv'.-Ly./2).^2
     η_e[radc.<radi] .= dt*Gi
     η_ev[radv.<radi].= dt*Gi
-    η_ve   .= (1.0./η_e  + 1.0./η_v).^-1
-    η_vev  .= (1.0./η_ev + 1.0./η_vv).^-1
-    Vx     .=   εbg.*Xvx
-    Vy     .= .-εbg.*Yvy
+    η_ve   .= (1.0./η_e + 1.0./η_v).^-1
+    Vx     .=  2.0.*εbg.*Yvx  # factor 2 such that Exy = Ebg
+    Vy     .=  0.0.*Yvy
+    Vx_bcN  =  2.0.*εbg.*Ly   # Vx at the top of the box
+    Vx_bcS  =  2.0.*εbg.*0.0  # Vx at the bottom
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
         iter=1; err=2*ε; err_evo1=[]; err_evo2=[]
-        Txx_o.=Txx;   Tyy_o.=Tyy;   Txy_o.=Txy;   λ.=0.0
-        Txxv_o.=Txxv; Tyyv_o.=Tyyv; Txyv_o.=Txyv; λv.=0.0
+        Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv; λ.=0.0
         local itg
         while (err>ε && iter<=iterMax)
             # divergence - pressure
@@ -123,30 +103,20 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             # strain rates
             Exx    .= diff(Vx, dims=1)./dx .- 1.0/3.0*∇V
             Eyy    .= diff(Vy, dims=2)./dy .- 1.0/3.0*∇V
-            Exyv[2:end-1,2:end-1] .= 0.5.*(diff(Vx[2:end-1,:], dims=2)./dy .+ diff(Vy[:,2:end-1], dims=1)./dx)
-            Exxv[2:end-1,2:end-1] .= av(Exx); Exxv[1,:].=Exxv[2,:]; Exxv[end,:].=Exxv[end-1,:]; Exxv[:,1].=Exxv[:,2]; Exxv[:,end].=Exxv[:,end-1]
-            Eyyv[2:end-1,2:end-1] .= av(Eyy); Eyyv[1,:].=Eyyv[2,:]; Eyyv[end,:].=Eyyv[end-1,:]; Eyyv[:,1].=Eyyv[:,2]; Eyyv[:,end].=Eyyv[:,end-1]
-            Ptv[2:end-1,2:end-1]  .= av(Pt);   Ptv[1,:].= Ptv[2,:];  Ptv[end,:].= Ptv[end-1,:];  Ptv[:,1].= Ptv[:,2];  Ptv[:,end].= Ptv[:,end-1]
+            Vxe[:,2:end-1] .= Vx; Vxe[:,1] .= 2.0*Vx_bcS .- Vxe[:,2]; Vxe[:,end] .= 2.0*Vx_bcN .- Vxe[:,end-1]
+            Vye[2:end-1,:] .= Vy; Vye[1,:] .=               Vye[2,:]; Vye[end,:] .=               Vye[end-1,:]
+            Exyv   .= 0.5.*(diff(Vxe, dims=2)./dy .+ diff(Vye, dims=1)./dx)
             # visco-elastic strain rates
             Exx1   .=    Exx   .+ Txx_o ./2.0./η_e
             Eyy1   .=    Eyy   .+ Tyy_o ./2.0./η_e
+            Exyv1  .=    Exyv  .+ Txyv_o./2.0./η_ev
             Exy1   .= av(Exyv) .+ Txy_o ./2.0./η_e
             Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ Exy1.^2)
-            # visco-elastic strain rates vertices
-            Exxv1  .=    Exxv  .+ Txxv_o./2.0./η_ev
-            Eyyv1  .=    Eyyv  .+ Tyyv_o./2.0./η_ev
-            Exyv1  .=    Exyv  .+ Txyv_o./2.0./η_ev
-            Eiiv   .= sqrt.(0.5*(Exxv1.^2 .+ Eyyv1.^2) .+ Exyv1.^2)
             # trial stress
             Txx    .= 2.0.*η_ve.*Exx1
             Tyy    .= 2.0.*η_ve.*Eyy1
             Txy    .= 2.0.*η_ve.*Exy1
             Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
-            # trial stress vertices
-            Txxv   .= 2.0.*η_vev.*Exxv1
-            Tyyv   .= 2.0.*η_vev.*Eyyv1
-            Txyv   .= 2.0.*η_vev.*Exyv1
-            Tiiv   .= sqrt.(0.5*(Txxv.^2 .+ Tyyv.^2) .+ Txyv.^2)
             # yield function
             F      .= Tii .- τ_y .- Pt.*sinϕ
             Pla    .= 0.0
@@ -155,14 +125,6 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             dQdTxx .= 0.5.*Txx./Tii
             dQdTyy .= 0.5.*Tyy./Tii
             dQdTxy .=      Txy./Tii
-            # yield function vertices
-            Fv     .= Tiiv .- τ_y .- Ptv.*sinϕ
-            Plav   .= 0.0
-            Plav   .= Fv .> 0.0
-            λv     .= Plav.*Fv./(η_vev .+ η_reg)
-            dQdTxxv.= 0.5.*Txxv./Tiiv
-            dQdTyyv.= 0.5.*Tyyv./Tiiv
-            dQdTxyv.=      Txyv./Tiiv
             # plastic corrections
             Txx    .= 2.0.*η_ve.*(Exx1 -     λ.*dQdTxx)
             Tyy    .= 2.0.*η_ve.*(Eyy1 -     λ.*dQdTyy)
@@ -170,15 +132,8 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
             Fchk   .= Tii .- τ_y .- Pt.*sinϕ .- λ.*η_reg
             η_vep  .= Tii./2.0./Eii
-            # plastic corrections vertices
-            Txxv   .= 2.0.*η_vev.*(Exxv1 -     λv.*dQdTxxv)
-            Tyyv   .= 2.0.*η_vev.*(Eyyv1 -     λv.*dQdTyyv)
-            Txyv   .= 2.0.*η_vev.*(Exyv1 - 0.5*λv.*dQdTxyv)
-            Tiiv   .= sqrt.(0.5*(Txxv.^2 .+ Tyyv.^2) .+ Txyv.^2)
-            Fchkv  .= Tiiv .- τ_y .- Ptv.*sinϕ .- λv.*η_reg
-            η_vepv .= Tiiv./2.0./Eiiv
-            # η_vepv[2:end-1,2:end-1] .= av(η_vep); η_vepv[1,:].=η_vepv[2,:]; η_vepv[end,:].=η_vepv[end-1,:]; η_vepv[:,1].=η_vepv[:,2]; η_vepv[:,end].=η_vepv[:,end-1]
-            # Txyv   .= 2.0.*η_vepv.*Exyv1
+            η_vepv[2:end-1,2:end-1].=av(η_vep); η_vepv[1,:].=η_vepv[2,:]; η_vepv[end,:].=η_vepv[end-1,:]; η_vepv[:,1].=η_vepv[:,2]; η_vepv[:,end].=η_vepv[:,end-1]
+            Txyv   .= 2.0.*η_vepv.*Exyv1
             # PT timestep
             dtVx   .= min(dx,dy)^2.0./av_xa(η_vep)./4.1./Vsc
             dtVy   .= min(dx,dy)^2.0./av_ya(η_vep)./4.1./Vsc
@@ -196,12 +151,12 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
                 norm_Rx = norm(Rx)/length(Rx); norm_Ry = norm(Ry)/length(Ry); norm_∇V = norm(∇V)/length(∇V)
                 err = maximum([norm_Rx, norm_Ry, norm_∇V])
                 push!(err_evo1, err); push!(err_evo2, itg)
-                @printf("it = %d, iter = %d, err = %1.2e norm[Rx=%1.2e, Ry=%1.2e, ∇V=%1.2e] (Fchk=%1.2e - Fchkv=%1.2e) \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V, maximum(Fchk), maximum(Fchkv))
+                @printf("it = %d, iter = %d, err = %1.2e norm[Rx=%1.2e, Ry=%1.2e, ∇V=%1.2e] (Fchk=%1.2e) \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V, maximum(Fchk))
             end
             iter+=1; itg=iter
         end
         t = t + dt
-        push!(evo_t, t); push!(evo_Txx, maximum(Txx))
+        push!(evo_t, t); push!(evo_Txx, maximum(Txy))
         # Plotting
         p1 = heatmap(xv, yc, Vx' , aspect_ratio=1, xlims=(0, Lx), ylims=(dy/2, Ly-dy/2), c=:inferno, title="Vx")
         # p2 = heatmap(xc, yv, Vy' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="Vy")

@@ -19,7 +19,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Gi      = G0/(6.0-4.0*do_DP) # elastic shear modulus perturbation
     εbg     = 1.0                # background strain-rate
     # Numerics
-    nt      = 10                 # number of time steps
+    nt      = 20                 # number of time steps
     nx, ny  = 63, 63             # numerical grid resolution
     Vdmp    = 4.0                # convergence acceleration (damping)
     Vsc     = 2.0                # iterative time step limiter
@@ -35,6 +35,8 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     ∇V      = zeros(Dat, nx  ,ny  )
     Vx      = zeros(Dat, nx+1,ny  )
     Vy      = zeros(Dat, nx  ,ny+1)
+    Vxe     = zeros(Dat, nx+1,ny+2)
+    Vye     = zeros(Dat, nx+2,ny+1)
     Exx     = zeros(Dat, nx  ,ny  )
     Eyy     = zeros(Dat, nx  ,ny  )
     Exyv    = zeros(Dat, nx+1,ny+1)
@@ -107,8 +109,10 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     η_ev[radv.<radi].= dt*Gi
     η_ve   .= (1.0./η_e  + 1.0./η_v).^-1
     η_vev  .= (1.0./η_ev + 1.0./η_vv).^-1
-    Vx     .=   εbg.*Xvx
-    Vy     .= .-εbg.*Yvy
+    Vx     .=  2.0.*εbg.*Yvx  # factor 2 such that Exy = Ebg
+    Vy     .=  0.0.*Yvy
+    Vx_bcN  =  2.0.*εbg.*Ly   # Vx at the top of the box
+    Vx_bcS  =  2.0.*εbg.*0.0  # Vx at the bottom
     # Time loop
     t=0.0; evo_t=[]; evo_Txx=[]
     for it = 1:nt
@@ -123,7 +127,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             # strain rates
             Exx    .= diff(Vx, dims=1)./dx .- 1.0/3.0*∇V
             Eyy    .= diff(Vy, dims=2)./dy .- 1.0/3.0*∇V
-            Exyv[2:end-1,2:end-1] .= 0.5.*(diff(Vx[2:end-1,:], dims=2)./dy .+ diff(Vy[:,2:end-1], dims=1)./dx)
+            Vxe[:,2:end-1] .= Vx; Vxe[:,1] .= 2.0*Vx_bcS .- Vxe[:,2]; Vxe[:,end] .= 2.0*Vx_bcN .- Vxe[:,end-1]
+            Vye[2:end-1,:] .= Vy; Vye[1,:] .=               Vye[2,:]; Vye[end,:] .=               Vye[end-1,:]
+            Exyv   .= 0.5.*(diff(Vxe, dims=2)./dy .+ diff(Vye, dims=1)./dx)
             Exxv[2:end-1,2:end-1] .= av(Exx); Exxv[1,:].=Exxv[2,:]; Exxv[end,:].=Exxv[end-1,:]; Exxv[:,1].=Exxv[:,2]; Exxv[:,end].=Exxv[:,end-1]
             Eyyv[2:end-1,2:end-1] .= av(Eyy); Eyyv[1,:].=Eyyv[2,:]; Eyyv[end,:].=Eyyv[end-1,:]; Eyyv[:,1].=Eyyv[:,2]; Eyyv[:,end].=Eyyv[:,end-1]
             Ptv[2:end-1,2:end-1]  .= av(Pt);   Ptv[1,:].= Ptv[2,:];  Ptv[end,:].= Ptv[end-1,:];  Ptv[:,1].= Ptv[:,2];  Ptv[:,end].= Ptv[:,end-1]
@@ -201,7 +207,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             iter+=1; itg=iter
         end
         t = t + dt
-        push!(evo_t, t); push!(evo_Txx, maximum(Txx))
+        push!(evo_t, t); push!(evo_Txx, maximum(Txy))
         # Plotting
         p1 = heatmap(xv, yc, Vx' , aspect_ratio=1, xlims=(0, Lx), ylims=(dy/2, Ly-dy/2), c=:inferno, title="Vx")
         # p2 = heatmap(xc, yv, Vy' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="Vy")
