@@ -20,3 +20,7 @@ The Julia codes implementing 2D Stokes equations and visco-elasto-plastic shear 
 - [`Stokes2D_vep_reg_simpleshear_vc.jl`](Stokes2D_vep_reg_simpleshear_vc.jl) resolve regularised brittle failure of a bloc containing a visco-elastic inclusion in **vertices and centres** formulation.
 
 ![](output_vep_ss_vc.png)
+
+- [`Stokes2D_vep_reg_simpleshear_stress.jl`](Stokes2D_vep_reg_simpleshear_stress.jl) resolve regularised brittle failure of a bloc containing a visco-elastic inclusion in **centres** formulation with extrapolation of the corrected shear stress instead of the corrected effective visco-elasto-plastic viscosity.
+
+![](output_vep_ss_c_stress.png)
