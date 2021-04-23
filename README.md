@@ -12,6 +12,7 @@ This repository contains concise [Julia] 2D iterative visco-elasto-plastic (VEP)
 * [Experiment results](#experiment-results)
 * [Running the codes](#running-the-codes)
 * [Vertices-Centres formulation](#vertices-centres-formulation)
+* [Centres `tauxy` formulation](#centres-tauxy-formulation)
 * [Extra material](#extra-material)
 * [References](#references)
 
