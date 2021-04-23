@@ -5,7 +5,7 @@ Visco-elasto-plastic rheology for 2D Stokes solvers and continuum mechanics.
 
 This repository contains concise [Julia] 2D iterative visco-elasto-plastic (VEP) incompressible and single phase Stokes solvers to (1) resolve pressure, velocity and visco-elastic stress distribution around a buoyant ductile spherical inclusion, (2) capture the visco-elastic stress build-up in a homogeneous or inclusion sample and (3) adding yielding of the visco-elastic material to resolve visco-elasto-plastic rheology (Von Mises and Drucker-Prager).
 
-⚠️ **Work in progress:** The current codes rely on a centres implementation of the VEP rheology (staggered grid). Pure shear configuration results are accurate ([more here](#vertices-centres-formulation)) but simple shear experiments fail to localise compared to vertices only or vertices and centres formulations. More details in the [wip_codes](wip_codes/) folder.
+⚠️ **Work in progress:** The current codes rely on a centres implementation of the VEP rheology (staggered grid). Pure shear configuration results are accurate ([more here](#vertices-centres-formulation)) but simple shear experiments fail to localise compared to vertices only or vertices and centres formulations. More details in the [simpleshear](simpleshear/) folder for the fix.
 
 ## Content
 * [Julia Codes](#julia-codes)
@@ -23,6 +23,7 @@ The Julia codes implementing 2D Stokes equations and visco-elastic or visco-elas
 - [`Stokes2D_vep.jl`](Stokes2D_vep.jl) resolve brittle failure of a bloc containing a visco-elastic inclusion. The `do_DP` switch enable taking friction angle into account (Drucker-Prager instead of Von Mises) (3).
 - [`Stokes2D_vep_reg.jl`](Stokes2D_vep_reg.jl) resolve regularised brittle failure of a bloc containing a visco-elastic inclusion. The `do_DP` switch enable taking friction angle into account (Drucker-Prager instead of Von Mises) (3) and the `η_reg` switch sets the regularisation length scale \[[1]\].
 - [`Stokes2D_vep_reg_vc.jl`](Stokes2D_vep_reg_vc.jl) is a version of the [`Stokes2D_vep_reg.jl`](Stokes2D_vep_reg.jl) implementation performing the plastic correction on both vertices and centres (vc) on the staggered grid.
+- [`Stokes2D_vep_reg_ctau.jl`](Stokes2D_vep_reg_ctau.jl) is a version of the [`Stokes2D_vep_reg.jl`](Stokes2D_vep_reg.jl) implementation performing interpolation of the shear stress `Txy` instead of the vep viscosity `η_vep`.
 
 ## Experiment results
 
@@ -66,7 +67,17 @@ The following results, to be compared to those in the [previous section](#regula
 - Results on a numerical resolution of 127x127 grid points:
 ![](docs/output_vep_dp_reg_vc_127x127.png)
 
-⚠️ **Work in progress:** Simple shear experiments fail to localise in centres only formulation compared to vertices only or vertices and centres formulations. More details in the [wip_codes](wip_codes/) folder.
+## Centres tauxy formulation
+
+⚠️ **Simple shear** experiments fail to localise in centres only formulation compared to vertices only or vertices and centres formulations. The solution is to interpolate the shear stress after the plastic correction instead of the effective viscosity. More details in the [simpleshear](simpleshear/) folder.
+
+The following results are based on the code  performing interpolation of the shear stress `Txy` instead of the vep viscosity `η_vep`. Also, the regularisation viscosity `η_reg` is set to `η_reg = 8.0e-3` instead of `η_reg = 1.2e-2` for the other formulation.
+
+- Results on a numerical grid resolution of 63x63 grid points:
+![](docs/output_vep_dp_reg_ctau_63x63.png)
+
+- Results on a numerical grid resolution of 127x127 grid points:
+![](docs/output_vep_dp_reg_ctau_127x127.png)
 
 ## Running the codes
 To execute the Julia scripts, clone or copy the current repository and launch [Julia] with the `--project` flag. From within the Julia REPL, add the project packages by running `instantiate`. Then execute the Julia scripts `<my_script.jl>` from within the REPL type `include("<my_script.jl>")`:
