@@ -67,11 +67,11 @@ The following results, to be compared to those in the [previous section](#regula
 - Results on a numerical resolution of 127x127 grid points:
 ![](docs/output_vep_dp_reg_vc_127x127.png)
 
-## Centres tauxy formulation
+## Centres `tauxy` formulation
 
 ⚠️ **Simple shear** experiments fail to localise in centres only formulation compared to vertices only or vertices and centres formulations. The solution is to interpolate the shear stress after the plastic correction instead of the effective viscosity. More details in the [simpleshear](simpleshear/) folder.
 
-The following results are based on the code  performing interpolation of the shear stress `Txy` instead of the vep viscosity `η_vep`. Also, the regularisation viscosity `η_reg` is set to `η_reg = 8.0e-3` instead of `η_reg = 1.2e-2` for the other formulation.
+The following results are based on the code [`Stokes2D_vep_reg_ctau.jl`](Stokes2D_vep_reg_ctau.jl) performing interpolation of the shear stress `Txy` instead of the vep viscosity `η_vep`. Also, the regularisation viscosity `η_reg` is set to `η_reg = 8.0e-3` instead of `η_reg = 1.2e-2` for the other formulation.
 
 - Results on a numerical grid resolution of 63x63 grid points:
 ![](docs/output_vep_dp_reg_ctau_63x63.png)
