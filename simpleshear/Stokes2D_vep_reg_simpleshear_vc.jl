@@ -198,7 +198,6 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             Vy[:,2:end-1] .= Vy[:,2:end-1] .+ dVydt.*dtVy
             # convergence check
             if mod(iter, nout)==0
-                global max_Rx, max_Ry, max_divV
                 norm_Rx = norm(Rx)/length(Rx); norm_Ry = norm(Ry)/length(Ry); norm_∇V = norm(∇V)/length(∇V)
                 err = maximum([norm_Rx, norm_Ry, norm_∇V])
                 push!(err_evo1, err); push!(err_evo2, itg)
