@@ -20,7 +20,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Vdmp    = 4.0         # convergence acceleration (damping)
     Ptsc    = 8.0         # iterative time step limiter
     ε       = 1e-6        # nonlinear tolerence
-    iterMax = 1e5         # max number of iters
+    iterMax = 1e5         # max number of iters
     nout    = 200         # check frequency
     # Preprocessing
     dx, dy  = Lx/nx, Ly/ny

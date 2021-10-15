@@ -25,7 +25,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Vsc     = 2.0                # iterative time step limiter
     Ptsc    = 6.0                # iterative time step limiter
     ε       = 1e-6               # nonlinear tolerence
-    iterMax = 3e4                # max number of iters
+    iterMax = 3e4                # max number of iters
     nout    = 200                # check frequency
     # Preprocessing
     dx, dy  = Lx/nx, Ly/ny
@@ -120,9 +120,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             dQdTyy .= 0.5.*Tyy./Tii
             dQdTxy .=      Txy./Tii
             # plastic corrections
-            Txx    .= 2.0.*η_ve.*(Exx1 -     λ.*dQdTxx)
-            Tyy    .= 2.0.*η_ve.*(Eyy1 -     λ.*dQdTyy)
-            Txy    .= 2.0.*η_ve.*(Exy1 - 0.5*λ.*dQdTxy)
+            Txx    .= 2.0.*η_ve.*(Exx1 .-      λ.*dQdTxx)
+            Tyy    .= 2.0.*η_ve.*(Eyy1 .-      λ.*dQdTyy)
+            Txy    .= 2.0.*η_ve.*(Exy1 .- 0.5.*λ.*dQdTxy)
             Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
             Fchk   .= Tii .- τ_y .- Pt.*sinϕ .- λ.*η_reg
             η_vep  .= Tii./2.0./Eii
