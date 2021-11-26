@@ -5,14 +5,17 @@ Visco-elasto-plastic rheology for 2D Stokes solvers and continuum mechanics.
 
 This repository contains concise [Julia] 2D iterative visco-elasto-plastic (VEP) incompressible and single phase Stokes solvers to (1) resolve pressure, velocity and visco-elastic stress distribution around a buoyant ductile spherical inclusion, (2) capture the visco-elastic stress build-up in a homogeneous or inclusion sample and (3) adding yielding of the visco-elastic material to resolve visco-elasto-plastic rheology (Von Mises and Drucker-Prager).
 
-⚠️ **Work in progress:** The current codes rely on a centres implementation of the VEP rheology (staggered grid). Pure shear configuration results are accurate ([more here](#vertices-centres-formulation)) but simple shear experiments fail to localise compared to vertices only or vertices and centres formulations. More details in the [simpleshear](simpleshear/) folder for the fix.
+⚠️ **Work in progress:**
+- The current codes rely on a centres implementation of the VEP rheology (staggered grid). Pure shear configuration results are accurate ([more here](#vertices-centres-formulation)) but simple shear experiments fail to localise compared to vertices only or vertices and centres formulations. More details in the [simpleshear](simpleshear/) folder for the fix.
+- The current code rely on a single damping approach (damping the momentum equations - [more here](#new-damping-approach)). A new damping approach may lead to more robust results and further stabilise the iteration count while shear-bands are forming. More details in the [newdamp](newdamp/) folder.
 
 ## Content
 * [Julia Codes](#julia-codes)
-* [Experiment results](#experiment-results)
 * [Running the codes](#running-the-codes)
+* [Experiment results](#experiment-results)
 * [Vertices-Centres formulation](#vertices-centres-formulation)
 * [Centres `tauxy` formulation](#centres-tauxy-formulation)
+* [New damping approach](#new-damping-approach)
 * [Extra material](#extra-material)
 * [References](#references)
 
@@ -25,6 +28,16 @@ The Julia codes implementing 2D Stokes equations and visco-elastic or visco-elas
 - [`Stokes2D_vep_reg.jl`](Stokes2D_vep_reg.jl) resolve regularised brittle failure of a bloc containing a visco-elastic inclusion. The `do_DP` switch enable taking friction angle into account (Drucker-Prager instead of Von Mises) (3) and the `η_reg` switch sets the regularisation length scale \[[1]\].
 - [`Stokes2D_vep_reg_vc.jl`](Stokes2D_vep_reg_vc.jl) is a version of the [`Stokes2D_vep_reg.jl`](Stokes2D_vep_reg.jl) implementation performing the plastic correction on both vertices and centres (vc) on the staggered grid.
 - [`Stokes2D_vep_reg_ctau.jl`](Stokes2D_vep_reg_ctau.jl) is a version of the [`Stokes2D_vep_reg.jl`](Stokes2D_vep_reg.jl) implementation performing interpolation of the shear stress `Txy` instead of the vep viscosity `η_vep`.
+
+## Running the codes
+To execute the Julia scripts, clone or copy the current repository and launch [Julia] with the `--project` flag. From within the Julia REPL, add the project packages by running `instantiate`. Then execute the Julia scripts `<my_script.jl>` from within the REPL type `include("<my_script.jl>")`:
+```julia-repl
+julia> ]
+
+(Stokes2D_simpleVEP) pkg> instantiate
+
+julia> include("Stokes2D_vep.jl")
+```
 
 ## Experiment results
 
@@ -80,15 +93,9 @@ The following results are based on the code [`Stokes2D_vep_reg_ctau.jl`](Stokes2
 - Results on a numerical grid resolution of 127x127 grid points:
 ![](docs/output_vep_dp_reg_ctau_127x127.png)
 
-## Running the codes
-To execute the Julia scripts, clone or copy the current repository and launch [Julia] with the `--project` flag. From within the Julia REPL, add the project packages by running `instantiate`. Then execute the Julia scripts `<my_script.jl>` from within the REPL type `include("<my_script.jl>")`:
-```julia-repl
-julia> ]
 
-(Stokes2D_simpleVEP) pkg> instantiate
-
-julia> include("Stokes2D_vep.jl")
-```
+## New damping approach
+The visco-elast-plastic scripts in the [newdamp](newdamp/) folder contain trials implementations of the new damping approach, using a double damping both on the stress-balance and momentum equations.
 
 ## Extra material
 The [extras](extras/) folder contains a version of the visco-elasto-plastic code running at higher resolution and producing a [gif](extras/Stokes2D_vep.gif), [`Stokes2D_vep_gif.jl`](extras/Stokes2D_vep_gif.jl).
