@@ -24,7 +24,7 @@ using Plots,LinearAlgebra,Printf
     nx,ny   = 63,63
     nt      = 10
     εnl     = 1e-6
-    maxiter = 50max(nx,ny)
+    maxiter = 150max(nx,ny)
     nchk    = 2max(nx,ny)
     Re      = 5π
     r       = 1.0
