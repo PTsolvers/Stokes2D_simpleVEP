@@ -96,6 +96,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
         p4 = plot(err_evo2, log10.(err_evo1), legend=false, xlabel="# iterations", ylabel="log10(error)", linewidth=2, markershape=:circle, markersize=3, framestyle=:box, labels="max(error)")
         display(plot(p1, p2, p3, p4))
     end
+    return
 end
 
 Stokes2D_ve()

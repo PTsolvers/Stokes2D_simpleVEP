@@ -212,6 +212,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
         display(plot(p1, p2, p3, p4))
     end
+    return
 end
 
 Stokes2D_vep()

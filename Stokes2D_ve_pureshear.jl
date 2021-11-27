@@ -110,6 +110,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
         plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytica solution
         display(plot(p1, p2, p3, p4))
     end
+    return
 end
 
 Stokes2D_ve()
