@@ -150,7 +150,8 @@ using Plots,LinearAlgebra,Printf
             τxy[2:end-1,2:end-1] .= 2.0 .* η_ve_τv[2:end-1,2:end-1].*(Exy_τ[2:end-1,2:end-1] .- 0.5 .* av(λ.*dQdTxy))
             @. τii    = sqrt(0.5*(τxx^2 + τyy^2) + τxyc*τxyc)
             @. Fchk   = τii - τ_y - Pr*sinϕ - λ*η_reg
-            @. η_vep  = τii / 2.0 / Eii * 19.3
+            @. η_vep  = τii / 2.0 / Eii * 19.3 # nx, ny = 63, 63 
+            # @. η_vep  = τii / 2.0 / Eii * 19.3 * 1.99 # nx, ny = 127, 127
             η_vepv[2:end-1,2:end-1] .= av(η_vep); bc2!(η_vep)
             # velocity update
             dVx .= av_xa(dτ_ρ) .* (.-diff(Pr, dims=1)./dx .+ diff(τxx, dims=1)./dx .+ diff(τxy[2:end-1,:], dims=2)./dy)
