@@ -54,12 +54,11 @@ using Plots, LinearAlgebra, Printf
     τyy_o   = zeros(nx  ,ny  )
     τxyc_o  = zeros(nx  ,ny  )
     τxy_o   = zeros(nx+1,ny+1)
-
+    # Here _r stands for real: physical stress for residual computation
     τxx_r   = zeros(nx  ,ny  )
     τyy_r   = zeros(nx  ,ny  )
     τxyc_r  = zeros(nx  ,ny  )
     τxy_r   = zeros(nx+1,ny+1)
-
     Vx      = zeros(nx+1,ny  )
     Vy      = zeros(nx  ,ny+1)
     dVx     = zeros(nx-1,ny  )
@@ -82,7 +81,6 @@ using Plots, LinearAlgebra, Printf
     Exyc_τ  = zeros(nx  ,ny  )
     η_ve_τ  = zeros(nx  ,ny  )
     η_ve_τv = zeros(nx+1,ny+1)
-    η_ve    = zeros(nx  ,ny  )
     η_vem   = zeros(nx  ,ny  )
     η_vev   = zeros(nx+1,ny+1)
     η_vevm  = zeros(nx+1,ny+1)
@@ -101,7 +99,6 @@ using Plots, LinearAlgebra, Printf
     @. G[xc^2 + yc'^2 < radi^2]  = Gi
     @. Gv[xv^2 + yv'^2 < radi^2] = Gi
     η_e   = G.*dt; η_ev = Gv.*dt
-    @. η_ve  = 1.0/(1.0/η  + 1.0/η_e)
     @. η_vec = 1.0/(1.0/η  + 1.0/η_e)
     @. η_vev = 1.0/(1.0/ηv + 1.0/η_ev)
     @. η_vep  = 1.0/(1.0/η  + 1.0/η_e)
