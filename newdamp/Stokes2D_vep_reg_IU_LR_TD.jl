@@ -126,8 +126,8 @@ using Plots, LinearAlgebra, Printf
             ∇V    .= diff(Vx, dims=1)./dx .+ diff(Vy, dims=2)./dy
             @. Pr -= r*Gdτ*∇V
             # strain rates
-            Exx   .= diff(Vx, dims=1)./dx
-            Eyy   .= diff(Vy, dims=2)./dy
+            Exx   .= diff(Vx, dims=1)./dx .- 1//3*∇V
+            Eyy   .= diff(Vy, dims=2)./dy .- 1//3*∇V
             Exy[2:end-1,2:end-1] .= 0.5.*(diff(Vx[2:end-1,:], dims=2)./dy .+ diff(Vy[:,2:end-1], dims=1)./dx)
             Exyc  .= av(Exy)
             # viscoelastic strain rates
