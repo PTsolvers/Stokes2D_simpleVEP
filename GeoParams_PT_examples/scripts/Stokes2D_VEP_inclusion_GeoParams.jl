@@ -13,6 +13,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     τii0v = zeros(size(ε̇xy))
     τii0v[2:end-1,2:end-1] = sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
 
+    # 
     P_v   = zeros(size(ε̇xy))
     P_v[2:end-1,2:end-1] = av(Pt)
     P_v[:,1] = P_v[:,2]; P_v[:,end] = P_v[:,end-1];
@@ -40,21 +41,30 @@ end
 # 2D Stokes routine
 @views function Stokes2D_VE_inclusion()
     # Physics
+    do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     Lx, Ly  = 1.0, 1.0  # domain size
     ξ       = 10.0      # Maxwell relaxation time
     η0      = 1.0       # viscous viscosity
-    G       = 1.0       # elastic shear modulus
+    G0      = 1.0       # elastic shear modulus
     εbg     = 1.0       # background strain-rate
     radi    = 0.01
+    τ_y     = 1.6 
+    Gi      = G0/(6.0-4.0*do_DP)      # inclusion shear modulus
+    η_reg   = 1.2e-2            # regularisation "viscosity"
+    ϕ       = 30*do_DP          
+    Coh     = 1.6/cosd(ϕ)      # cohesion
+    
+    #pl = DruckerPrager(C=1.0, ϕ=30)        # non-regularized plasticity
+    pl = Parallel(DruckerPrager(C=Coh, ϕ=ϕ), LinearViscous(η=η_reg))
 
     MatParam = (SetMaterialParams(Name="Matrix"   , Phase=1,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=G),LinearViscous(η=η0), DruckerPrager(C=1.0, ϕ=30))), 
+                CompositeRheology = CompositeRheology(ConstantElasticity(G=G0),LinearViscous(η=η0),pl)), 
                 SetMaterialParams(Name="Inclusion", Phase=2,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=G*0.1),LinearViscous(η=η0*0.1),  DruckerPrager(C=1.0, ϕ=30))),
+                CompositeRheology = CompositeRheology(ConstantElasticity(G=Gi),LinearViscous(η=η0),  pl)),
                 )
 
     # Numerics
-    nt       = 30        # number of time steps
+    nt       = 20        # number of time steps
     ncx, ncy = 51, 51    # numerical grid resolution
     ε        = 1e-6      # nonlinear tolerence
     iterMax  = 1e4       # max number of iters
