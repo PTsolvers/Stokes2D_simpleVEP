@@ -6,24 +6,33 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views av_xa(A) =  0.5*(A[1:end-1,:].+A[2:end,:])
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end]) 
 # Rheology
-@views function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
+@views function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Pt, Phasec, Phasev )
     ε̇iic  = ones(size(ε̇xx))
     ε̇iiv  = ones(size(ε̇xy))
     τii0c = sqrt.(1//2 .*(τxx0.^2 .+ τyy0.^2) .+ av(τxy0).^2)
     τii0v = zeros(size(ε̇xy))
     τii0v[2:end-1,2:end-1] = sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
+
+    P_v   = zeros(size(ε̇xy))
+    P_v[2:end-1,2:end-1] = av(Pt)
+    P_v[:,1] = P_v[:,2]; P_v[:,end] = P_v[:,end-1];
+    P_v[1,:] = P_v[2,:]; P_v[end,:] = P_v[end-1,:];
+    P_v[1,1] = P_v[2,2]; P_v[end,1] = P_v[end,2];
+    P_v[end,end] = P_v[end-1,end-1]; P_v[1,end] = P_v[1,end-1];
+    
     # Centroids
     for i in eachindex(τxx)
         v      = MatParam[Phasec[i]].CompositeRheology[1]
-        args   = (; τII_old = τii0c[i], dt=Δt)             
+        args   = (; τII_old = τii0c[i], dt=Δt, P=Pt[i])             
         ηc[i]  = computeViscosity_εII(v, ε̇iic[i], args)
         τxx[i] = 2*ηc[i]*ε̇xx[i]
         τyy[i] = 2*ηc[i]*ε̇yy[i]
     end
+
     # Vertices
     for i in eachindex(τxy)
         v      = MatParam[Phasev[i]].CompositeRheology[1]
-        args   = (; τII_old = τii0v[i], dt=Δt)
+        args   = (; τII_old = τii0v[i], dt=Δt, P=P_v[i])
         ηv[i]  = computeViscosity_εII(v, ε̇iiv[i], args)
         τxy[i] = 2*ηv[i]*ε̇xy[i] 
     end
@@ -39,9 +48,9 @@ end
     radi    = 0.01
 
     MatParam = (SetMaterialParams(Name="Matrix"   , Phase=1,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=G),LinearViscous(η=η0), DruckerPrager(C=1.0, ϕ=0))), 
+                CompositeRheology = CompositeRheology(ConstantElasticity(G=G),LinearViscous(η=η0), DruckerPrager(C=1.0, ϕ=30))), 
                 SetMaterialParams(Name="Inclusion", Phase=2,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=G*0.1),LinearViscous(η=η0*0.1),  DruckerPrager(C=1.0, ϕ=0))),
+                CompositeRheology = CompositeRheology(ConstantElasticity(G=G*0.1),LinearViscous(η=η0*0.1),  DruckerPrager(C=1.0, ϕ=30))),
                 )
 
     # Numerics
@@ -115,7 +124,7 @@ end
             ε̇yy   .= diff(Vy[2:end-1,:], dims=2)./Δy .- 1.0/3.0*∇V
             ε̇xy   .= 0.5.*(diff(Vx, dims=2)./Δy .+ diff(Vy, dims=1)./Δx)  
             # Stresses
-            UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
+            UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Pt, Phasec, Phasev )
             # Residuals
             Rx[2:end-1,:] .= .-diff(Pt, dims=1)./Δx .+ diff(τxx, dims=1)./Δx .+ diff(τxy[2:end-1,:], dims=2)./Δy
             Ry[:,2:end-1] .= .-diff(Pt, dims=2)./Δy .+ diff(τyy, dims=2)./Δy .+ diff(τxy[:,2:end-1], dims=1)./Δx #.+ av_ya(Rog)
