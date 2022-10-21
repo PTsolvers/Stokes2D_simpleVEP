@@ -6,54 +6,61 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views av_xa(A) =  0.5*(A[1:end-1,:].+A[2:end,:])
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end]) 
 # Rheology
-@views function UpdateStressGeoParams!( τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt )
-    ε̇iic  = ones(size(ε̇xx))
+@views function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
     ε̇iiv  = ones(size(ε̇xy))
     τii0c = sqrt.(1//2 .*(τxx0.^2 .+ τyy0.^2) .+ av(τxy0).^2)
+    ε̇iic = sqrt.(1//2 .*(ε̇xx.^2 .+ ε̇yy.^2) .+ av(ε̇xy).^2)
+    ε̇iiv[2:end-1,2:end-1] .= sqrt.(1//2 .*( av(ε̇xx).^2 .+ av(ε̇yy).^2) .+ ε̇xy[2:end-1,2:end-1].^2)
     τii0v = zeros(size(ε̇xy))
-    τii0v[2:end-1,2:end-1] = sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
-    Phase = 1
+    τii0v[2:end-1,2:end-1] .= sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
     # Centroids
     for i in eachindex(τxx)
-        v      = MatParam[Phase].CompositeRheology[1]
-        args   = (; τII_old = τii0c[i], dt=Δt)
-        η_eff  = computeViscosity_εII(v, ε̇iic[i], args)
-        τxx[i] = 2*η_eff*ε̇xx[i]
-        τyy[i] = 2*η_eff*ε̇yy[i]
+        v      = MatParam[Phasec[i]].CompositeRheology[1]
+        args   = (; τII_old = τii0c[i], dt=Δt)             
+        ηc[i]  = computeViscosity_εII(v, ε̇iic[i], args)
+        τxx[i] = 2*ηc[i]*ε̇xx[i]
+        τyy[i] = 2*ηc[i]*ε̇yy[i]
     end
     # Vertices
     for i in eachindex(τxy)
-        v      = MatParam[Phase].CompositeRheology[1]
+        v      = MatParam[Phasev[i]].CompositeRheology[1]
         args   = (; τII_old = τii0v[i], dt=Δt)
-        η_eff  = computeViscosity_εII(v, ε̇iiv[i], args)
-        τxy[i] = 2*η_eff*ε̇xy[i] 
+        ηv[i]  = computeViscosity_εII(v, ε̇iiv[i], args)
+        τxy[i] = 2*ηv[i]*ε̇xy[i] 
     end
 end
+
 # 2D Stokes routine
-@views function Stokes2D_VE_benchmark()
+@views function Stokes2D_VE_inclusion()
+    # Switches
+    UseGeoParams = true
     # Physics
     Lx, Ly  = 1.0, 1.0  # domain size
     ξ       = 10.0      # Maxwell relaxation time
     η0      = 1.0       # viscous viscosity
     G       = 1.0       # elastic shear modulus
     εbg     = 1.0       # background strain-rate
+    radi    = 0.01
 
-    MatParam = (SetMaterialParams(Name="Matrix", Phase=1,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=G),LinearViscous(η=η0))),)
+    MatParam = (SetMaterialParams(Name="Matrix"   , Phase=1,
+                CompositeRheology = CompositeRheology(ConstantElasticity(G=G),LinearViscous(η=η0))), 
+                SetMaterialParams(Name="Inclusion", Phase=2,
+                CompositeRheology = CompositeRheology(ConstantElasticity(G=G/6),LinearViscous(η=η0))),
+                )
 
     # Numerics
-    nt       = 1        # number of time steps
+    nt       = 10        # number of time steps
     ncx, ncy = 31, 31    # numerical grid resolution
     ε        = 1e-6      # nonlinear tolerence
-    iterMax  = 1e5       # max number of iters
-    nout     = 200       # check frequency
+    iterMax  = 1e4       # max number of iters
+    nout     = 500       # check frequency
     # Iterative parameters -------------------------------------------
     Reopt    = 5π
-    cfl      = 0.5
-    ρ        = 1#cfl*Reopt/ncx
+    cfl      = 0.50
+    ρ        = cfl*Reopt/ncx
     # Preprocessing
-    Δx, Δy  = Lx/ncx, Ly/ncy
-    Δt      = η0/(G*ξ + 1e-15)
+    Δx, Δy   = Lx/ncx, Ly/ncy
+    Δt       = η0/(G*ξ + 1e-15) 
     # Array initialisation
     Pt       = zeros(Dat, ncx  ,ncy  )
     ∇V       = zeros(Dat, ncx  ,ncy  )
@@ -81,17 +88,37 @@ end
     Rog      = zeros(Dat, ncx  ,ncy  )
     ηc       = η0*ones(Dat, ncx, ncy)
     ηv       = η0*ones(Dat, ncx+1, ncy+1)
+    Phasec   = ones(Int, ncx  ,ncy  )
+    Phasev   = ones(Int, ncx+1,ncy+1)
+    # For non-geoparams version
+    η, G     = 1.0, 1.0
+    ηe_c     = Δt*G.*ones(Dat, ncx  ,ncy  )
+    ηe_v     = Δt*G.*ones(Dat, ncx+1,ncy+1)
+    ηve_c    = zeros(Dat, ncx  ,ncy  )
+    ηve_v    = zeros(Dat, ncx+1,ncy+1)
     # Initialisation
-    xc, yc    = LinRange( Δx/2, Lx-Δx/2, ncx+0), LinRange( Δy/2, Ly-Δy/2, ncy+0)
     xce, yce  = LinRange(-Δx/2, Lx+Δx/2, ncx+2), LinRange(-Δy/2, Ly+Δy/2, ncy+2)
-    xv, yv    = LinRange(0.0, Lx, ncx+1), LinRange(0.0, Ly, ncy+1)
+    xc, yc   = LinRange(Δx/2, Lx-Δx/2, ncx), LinRange(Δy/2, Ly-Δy/2, ncy)
+    xv, yv   = LinRange(0.0, Lx, ncx+1), LinRange(0.0, Ly, ncy+1)
+    radc     = (xc.-Lx./2).^2 .+ (yc'.-Ly./2).^2
+    radv     = (xv.-Lx./2).^2 .+ (yv'.-Ly./2).^2
+    # For non-geoparams version
+    Phasec[radc.<radi] .= 2
+    Phasev[radv.<radi] .= 2
+    ηe_c[radc.<radi]   .= Δt*G/6.0
+    ηe_v[radv.<radi]   .= Δt*G/6.0
+    ηve_c              .= (1.0./ηe_c .+ 1.0./η).^(-1)
+    ηve_v              .= (1.0./ηe_v .+ 1.0./η).^(-1)
+    ηc                 .= ηve_c
+    ηv                 .= ηve_v
+    # Velocity
     (Xvx,Yvx) = ([x for x=xv,y=yce], [y for x=xv,y=yce])
     (Xvy,Yvy) = ([x for x=xce,y=yv], [y for x=xce,y=yv])
     Vx     .=   εbg.*Xvx
     Vy     .= .-εbg.*Yvy
     # Time loop
     t=0.0; evo_t=[]; evo_τxx=[]
-    for it = 1:nt
+    for it = 1:50
         iter=1; err=2*ε; err_evo1=[]; err_evo2=[]; 
         τxx0.=τxx; τyy0.=τyy; τxy0.=τxy
         while (err>ε && iter<=iterMax)
@@ -106,19 +133,22 @@ end
             ε̇yy   .= diff(Vy[2:end-1,:], dims=2)./Δy .- 1.0/3.0*∇V
             ε̇xy   .= 0.5.*(diff(Vx, dims=2)./Δy .+ diff(Vy, dims=1)./Δx)  
             # Stresses
-            UpdateStressGeoParams!( τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt )
-            if iter==1
-                display(τxx')
+            if UseGeoParams
+                UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
+            else
+                τxx   .= 2 .* ηve_c .* ( ε̇xx .+ τxx0./(2 .* ηe_c) ) 
+                τyy   .= 2 .* ηve_c .* ( ε̇yy .+ τyy0./(2 .* ηe_c) )
+                τxy   .= 2 .* ηve_v .* ( ε̇xy .+ τxy0./(2 .* ηe_v) )
             end
             # Residuals
             Rx[2:end-1,:] .= .-diff(Pt, dims=1)./Δx .+ diff(τxx, dims=1)./Δx .+ diff(τxy[2:end-1,:], dims=2)./Δy
             Ry[:,2:end-1] .= .-diff(Pt, dims=2)./Δy .+ diff(τyy, dims=2)./Δy .+ diff(τxy[:,2:end-1], dims=1)./Δx #.+ av_ya(Rog)
             Rp            .= .-∇V
             # PT time step -----------------------------------------------
-            Δτv  .= ρ*min(Δx,Δy)^2 ./ ηv ./ 4.1 * cfl 
+            Δτv  .= ρ*min(Δx,Δy)^2 ./ ηv ./ 4.1 * cfl   
             Δτvx .= (Δτv[:,1:end-1] .+ Δτv[:,2:end]) / 2.
             Δτvy .= (Δτv[1:end-1,:] .+ Δτv[2:end,:]) / 2.
-            κΔτp .= cfl .* ηc .* Δx ./ Lx
+            κΔτp .= cfl .* ηc .* Δx ./ Lx  
             # Calculate rate update --------------------------------------
             dVxdτ          .= (1-ρ) .* dVxdτ .+ Rx
             dVydτ          .= (1-ρ) .* dVydτ .+ Ry
@@ -141,12 +171,13 @@ end
         # Plotting
         p1 = heatmap(xv, yc, Vx[:,2:end-1]', aspect_ratio=1, xlims=(0, Lx), ylims=(Δy/2, Ly-Δy/2), c=:inferno, title="Vx")
         p2 = heatmap(xc, yv, Vy[2:end-1,:]', aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="Vy")
-        p3 = heatmap(xc, yc, ε̇xx' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="P")
-        p4 = plot(evo_t, evo_τxx , legend=false, xlabel="time", ylabel="max(τxx)", linewiΔth=0, markershape=:circle, framestyle=:box, markersize=3)
-        p4 = plot!(evo_t, 2.0.*εbg.*η0.*(1.0.-exp.(.-evo_t.*G./η0)), linewiΔth=2.0) # analytical solution
+        p3 = heatmap(xc, yc, Pt' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="P")
+        # p3 = heatmap(xv, yv, τxy' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="τxy")
+        p4 = plot(evo_t, evo_τxx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
+        p4 = plot!(evo_t, 2.0.*εbg.*η0.*(1.0.-exp.(.-evo_t.*G./η0)), linewidth=2.0) # analytical solution
         display(plot(p1, p2, p3, p4))
     end
     return
 end
 
-Stokes2D_VE_benchmark()
+Stokes2D_VE_inclusion()
