@@ -6,12 +6,11 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views av_xa(A) =  0.5*(A[1:end-1,:].+A[2:end,:])
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end]) 
 # Rheology
-@views function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
-    ε̇iic  = ones(size(ε̇xx))
-    ε̇iiv  = ones(size(ε̇xy))
-    τii0c = sqrt.(1//2 .*(τxx0.^2 .+ τyy0.^2) .+ av(τxy0).^2)
-    τii0v = zeros(size(ε̇xy))
-    τii0v[2:end-1,2:end-1] = sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
+@views function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, MatParam, Δt, Phasec, Phasev )
+    ε̇iic                   .= sqrt.(1//2 .*(ε̇xx.^2 .+ ε̇yy.^2) .+ av(ε̇xy).^2)
+    ε̇iiv[2:end-1,2:end-1]  .= sqrt.(1//2 .*( av(ε̇xx).^2 .+ av(ε̇yy).^2) .+ ε̇xy[2:end-1,2:end-1].^2)
+    τii0c                  .= sqrt.(1//2 .*(τxx0.^2 .+ τyy0.^2) .+ av(τxy0).^2)
+    τii0v[2:end-1,2:end-1] .= sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
     # Centroids
     for i in eachindex(τxx)
         v      = MatParam[Phasec[i]].CompositeRheology[1]
@@ -32,7 +31,7 @@ end
 # 2D Stokes routine
 @views function Stokes2D_VE_inclusion()
     # Switches
-    UseGeoParams = false
+    UseGeoParams = true
     # Physics
     Lx, Ly  = 1.0, 1.0  # domain size
     ξ       = 10.0      # Maxwell relaxation time
@@ -89,6 +88,11 @@ end
     ηv       = η0*ones(Dat, ncx+1, ncy+1)
     Phasec   = ones(Int, ncx  ,ncy  )
     Phasev   = ones(Int, ncx+1,ncy+1)
+    # For geoparams
+    τii0c    = zeros(size(ε̇xx))
+    τii0v    = zeros(size(ε̇xy))
+    ε̇iic     = zeros(size(ε̇xx))
+    ε̇iiv     = zeros(size(ε̇xy))
     # For non-geoparams version
     η, G     = 1.0, 1.0
     ηe_c     = Δt*G.*ones(Dat, ncx  ,ncy  )
@@ -133,7 +137,7 @@ end
             ε̇xy   .= 0.5.*(diff(Vx, dims=2)./Δy .+ diff(Vy, dims=1)./Δx)  
             # Stresses
             if UseGeoParams
-                UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
+                UpdateStressGeoParams!(  ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, MatParam, Δt, Phasec, Phasev )
             else
                 τxx   .= 2 .* ηve_c .* ( ε̇xx .+ τxx0./(2 .* ηe_c) ) 
                 τyy   .= 2 .* ηve_c .* ( ε̇yy .+ τyy0./(2 .* ηe_c) )
@@ -157,7 +161,7 @@ end
             Vy[2:end-1,:]  .+= Δτvy ./ ρ .* dVydτ
             Pt             .+= κΔτp .* dPdτ
             # convergence check
-            if mod(iter, nout)==0
+            if mod(iter, nout)==0 || iter==1
                 norm_Rx = norm(Rx)/sqrt(length(Rx)); norm_Ry = norm(Ry)/sqrt(length(Ry)); norm_∇V = norm(∇V)/sqrt(length(∇V))
                 err = maximum([norm_Rx, norm_Ry, norm_∇V])
                 push!(err_evo1, err); push!(err_evo2, itg)
