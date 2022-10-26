@@ -12,63 +12,39 @@ Dat = Float64 # Precision (double=Float64 or single=Float32)
     end
 end
 # Rheology
-# @views function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, MatParam, Δt, Phasec, Phasev )
-#     # ε̇iic                   .= sqrt.(1//2 .*(ε̇xx.^2 .+ ε̇yy.^2) .+ av(ε̇xy).^2)
-#     # ε̇iiv[2:end-1,2:end-1]  .= sqrt.(1//2 .*( av(ε̇xx).^2 .+ av(ε̇yy).^2) .+ ε̇xy[2:end-1,2:end-1].^2)
-#     # τii0c                  .= sqrt.(1//2 .*(τxx0.^2 .+ τyy0.^2) .+ av(τxy0).^2)
-#     # τii0v[2:end-1,2:end-1] .= sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
-#     # Centroids
-#     for j ∈ axes(ε̇xx,2), i ∈ axes(ε̇xx,1)
-#         # v      = MatParam[Phasec[i]].CompositeRheology[1] # indexation of MatParam with Phasec[i] causes allocation
-#         τxy0c    = .25*(τxy0[i,j] + τxy0[i+1,j] + τxy0[i,j+1] + τxy0[i+1,j+1])
-#         ε̇xyc     = .25*( ε̇xy[i,j] +  ε̇xy[i+1,j] +  ε̇xy[i,j+1] +  ε̇xy[i+1,j+1]) 
-#         τii0     =  sqrt.(0.5 *(τxx0[i,j]^2 + τyy0[i,j]^2) + τxy0c^2)
-#         ε̇ii      =  sqrt.(0.5 *( ε̇xx[i,j]^2 +  ε̇yy[i,j]^2) +  ε̇xyc^2)
-#         args     = (; τII_old = τii0, dt=Δt)             
-#         ηc[i,j]  = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
-#         τxx[i,j] = 2*ηc[i,j]*ε̇xx[i,j]
-#         τyy[i,j] = 2*ηc[i,j]*ε̇yy[i,j]
-#     end
-#     # Vertices
-#     for j ∈ 2:size(ε̇xy,2)-1, i ∈ 2:size(ε̇xy,1)-1
-#         τxx0c    = .25*(τxx0[i,j] + τxx0[i-1,j] + τxx0[i,j-1] + τxx0[i-1,j-1])
-#         τyy0c    = .25*(τyy0[i,j] + τyy0[i-1,j] + τyy0[i,j-1] + τyy0[i-1,j-1])
-#         ε̇xxc     = .25*( ε̇xx[i,j] +  ε̇xx[i-1,j] +  ε̇xx[i,j-1] +  ε̇xx[i-1,j-1]) 
-#         ε̇yyc     = .25*( ε̇yy[i,j] +  ε̇yy[i-1,j] +  ε̇yy[i,j-1] +  ε̇yy[i-1,j-1])
-#         τii0     =  sqrt.(0.5 *(τxx0c^2 + τyy0c^2) + τxy0[i,j]^2)
-#         ε̇ii      =  sqrt.(0.5 *( ε̇xxc^2 +  ε̇yyc^2) +  ε̇xy[i,j]^2)
-#         args     = (; τII_old = τii0, dt=Δt)
-#         ηv[i,j]  = phase_viscosity(MatParam, ε̇ii, Phasev[i,j], args)
-#         τxy[i,j] = 2*ηv[i,j]*ε̇xy[i,j] 
-#     end
-# end
-
 @views function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, MatParam, Δt, Phasec, Phasev )
-    ε̇iic                   .= sqrt.(1//2 .*(ε̇xx.^2 .+ ε̇yy.^2) .+ av(ε̇xy).^2)
-    ε̇iiv[2:end-1,2:end-1]  .= sqrt.(1//2 .*( av(ε̇xx).^2 .+ av(ε̇yy).^2) .+ ε̇xy[2:end-1,2:end-1].^2)
-    τii0c                  .= sqrt.(1//2 .*(τxx0.^2 .+ τyy0.^2) .+ av(τxy0).^2)
-    τii0v[2:end-1,2:end-1] .= sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
+    # ε̇iic                   .= sqrt.(1//2 .*(ε̇xx.^2 .+ ε̇yy.^2) .+ av(ε̇xy).^2)
+    # ε̇iiv[2:end-1,2:end-1]  .= sqrt.(1//2 .*( av(ε̇xx).^2 .+ av(ε̇yy).^2) .+ ε̇xy[2:end-1,2:end-1].^2)
+    # τii0c                  .= sqrt.(1//2 .*(τxx0.^2 .+ τyy0.^2) .+ av(τxy0).^2)
+    # τii0v[2:end-1,2:end-1] .= sqrt.(1//2 .*( av(τxx0).^2 .+ av(τyy0).^2) .+ τxy0[2:end-1,2:end-1].^2)
     # Centroids
-    for i in eachindex(τxx)
-        v      = MatParam[Phasec[i]].CompositeRheology[1]
-        args   = (; τII_old = τii0c[i], dt=Δt)             
-        ηc[i]  = computeViscosity_εII(v, ε̇iic[i], args)
-        τxx[i] = 2*ηc[i]*ε̇xx[i]
-        τyy[i] = 2*ηc[i]*ε̇yy[i]
+    for j ∈ axes(ε̇xx,2), i ∈ axes(ε̇xx,1)
+        # v      = MatParam[Phasec[i]].CompositeRheology[1] # indexation of MatParam with Phasec[i] causes allocation
+        τxy0c    = .25*(τxy0[i,j] + τxy0[i+1,j] + τxy0[i,j+1] + τxy0[i+1,j+1])
+        ε̇xyc     = .25*( ε̇xy[i,j] +  ε̇xy[i+1,j] +  ε̇xy[i,j+1] +  ε̇xy[i+1,j+1]) 
+        τii0     =  sqrt.(0.5 *(τxx0[i,j]^2 + τyy0[i,j]^2) + τxy0c^2)
+        ε̇ii      =  sqrt.(0.5 *( ε̇xx[i,j]^2 +  ε̇yy[i,j]^2) +  ε̇xyc^2)
+        args     = (; τII_old = τii0, dt=Δt)             
+        ηc[i,j]  = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
+        τxx[i,j] = 2*ηc[i,j]*ε̇xx[i,j]
+        τyy[i,j] = 2*ηc[i,j]*ε̇yy[i,j]
     end
     # Vertices
     for j ∈ 2:size(ε̇xy,2)-1, i ∈ 2:size(ε̇xy,1)-1
-        v      = MatParam[Phasev[i,j]].CompositeRheology[1]
-        args   = (; τII_old = τii0v[i,j], dt=Δt)
-        ηv[i,j]  = computeViscosity_εII(v, ε̇iiv[i,j], args)
+        τxx0c    = .25*(τxx0[i,j] + τxx0[i-1,j] + τxx0[i,j-1] + τxx0[i-1,j-1])
+        τyy0c    = .25*(τyy0[i,j] + τyy0[i-1,j] + τyy0[i,j-1] + τyy0[i-1,j-1])
+        ε̇xxc     = .25*( ε̇xx[i,j] +  ε̇xx[i-1,j] +  ε̇xx[i,j-1] +  ε̇xx[i-1,j-1]) 
+        ε̇yyc     = .25*( ε̇yy[i,j] +  ε̇yy[i-1,j] +  ε̇yy[i,j-1] +  ε̇yy[i-1,j-1])
+        τii0     =  sqrt.(0.5 *(τxx0c^2 + τyy0c^2) + τxy0[i,j]^2)
+        ε̇ii      =  sqrt.(0.5 *( ε̇xxc^2 +  ε̇yyc^2) +  ε̇xy[i,j]^2)
+        args     = (; τII_old = τii0, dt=Δt)
+        ηv[i,j]  = phase_viscosity(MatParam, ε̇ii, Phasev[i,j], args)
         τxy[i,j] = 2*ηv[i,j]*ε̇xy[i,j] 
     end
 end
 
 # 2D Stokes routine
-@views function Stokes2D_VE_inclusion()
-    # Switches
-    UseGeoParams = true
+@views function Stokes2D_VE_inclusion(UseGeoParams)
     # Physics
     Lx, Ly  = 1.0, 1.0  # domain size
     ξ       = 10.0      # Maxwell relaxation time
@@ -207,18 +183,22 @@ end
             end
             iter+=1; global itg=iter
         end
-        t = t + Δt
-        push!(evo_t, t); push!(evo_τxx, maximum(τxx))
+        # t = t + Δt
+        # push!(evo_t, t); push!(evo_τxx, maximum(τxx))
         # Plotting
-        p1 = heatmap(xv, yc, Vx[:,2:end-1]', aspect_ratio=1, xlims=(0, Lx), ylims=(Δy/2, Ly-Δy/2), c=:inferno, title="Vx")
-        p2 = heatmap(xc, yv, Vy[2:end-1,:]', aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="Vy")
-        p3 = heatmap(xc, yc, Pt' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="P")
-        # p3 = heatmap(xv, yv, τxy' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="τxy")
-        p4 = plot(evo_t, evo_τxx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
-        p4 = plot!(evo_t, 2.0.*εbg.*η0.*(1.0.-exp.(.-evo_t.*G./η0)), linewidth=2.0) # analytical solution
-        display(plot(p1, p2, p3, p4))
+        # p1 = heatmap(xv, yc, Vx[:,2:end-1]', aspect_ratio=1, xlims=(0, Lx), ylims=(Δy/2, Ly-Δy/2), c=:inferno, title="Vx")
+        # p2 = heatmap(xc, yv, Vy[2:end-1,:]', aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="Vy")
+        # p3 = heatmap(xc, yc, Pt' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="P")
+        # # p3 = heatmap(xv, yv, τxy' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="τxy")
+        # p4 = plot(evo_t, evo_τxx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
+        # p4 = plot!(evo_t, 2.0.*εbg.*η0.*(1.0.-exp.(.-evo_t.*G./η0)), linewidth=2.0) # analytical solution
+        # display(plot(p1, p2, p3, p4))
     end
     return
 end
 
-Stokes2D_VE_inclusion()
+for i=1:2
+    println("step $i")
+    @time Stokes2D_VE_inclusion(false)
+    @time Stokes2D_VE_inclusion(true)
+end
