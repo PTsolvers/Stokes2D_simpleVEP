@@ -32,7 +32,7 @@ function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε�
         ε̇ii      =  sqrt(0.5 *( ε̇xx[i,j]^2 +  ε̇yy[i,j]^2) + av_c(ε̇xy,i,j)^2)
         args     = (; τII_old = τii0, dt=Δt)             
         η = ηc[i,j] = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
-        τxx[i,j] = 2.0*η*ε̇xx[i,j]324
+        τxx[i,j] = 2.0*η*ε̇xx[i,j]
         τyy[i,j] = 2.0*η*ε̇yy[i,j]
     end
     # Vertices
