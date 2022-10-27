@@ -25,12 +25,12 @@ end
 end
 
 # Rheology
-function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
+function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, Pt, MatParam, Δt, Phasec, Phasev )
     # Centroids
     @inbounds for j ∈ axes(ε̇xx,2), i ∈ axes(ε̇xx,1)
         τii0     =  sqrt(0.5 *(τxx0[i,j]^2 + τyy0[i,j]^2) + av_c(τxy0,i,j)^2)
         ε̇ii      =  sqrt(0.5 *( ε̇xx[i,j]^2 +  ε̇yy[i,j]^2) + av_c(ε̇xy,i,j)^2)
-        args     = (; τII_old = τii0, dt=Δt)             
+        args     = (; τII_old = τii0, dt=Δt, P=Pt[i,j])             
         η = ηc[i,j] = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
         τxx[i,j] = 2.0*η*ε̇xx[i,j]
         τyy[i,j] = 2.0*η*ε̇yy[i,j]
@@ -39,49 +39,42 @@ function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε�
     @inbounds for j ∈ 2:size(ε̇xy,2)-1, i ∈ 2:size(ε̇xy,1)-1
         τii0     = sqrt(0.5 * (av_v(τxx0,i,j)^2 + av_v(τyy0,i,j)^2) + τxy0[i,j]^2)
         ε̇ii      = sqrt(0.5 * (av_v(ε̇xx,i,j)^2 + av_v(ε̇yy,i,j)^2) + ε̇xy[i,j]^2)
-        args     = (; τII_old = τii0, dt=Δt)
+        args     = (; τII_old = τii0, dt=Δt, P=av_v(Pt,i,j))
         η = ηv[i,j]  = phase_viscosity(MatParam, ε̇ii, Phasev[i,j], args)
         τxy[i,j] = 2.0*η*ε̇xy[i,j] 
     end
 end
 
-function viscosityGeoParams!(ηc, ηv, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
-    # Centroids
-    @inbounds for j ∈ axes(ε̇xx,2), i ∈ axes(ε̇xx,1)
-        τii0     =  sqrt(0.5 *(τxx0[i,j]^2 + τyy0[i,j]^2) + av_c(τxy0,i,j)^2)
-        ε̇ii      =  sqrt(0.5 *( ε̇xx[i,j]^2 +  ε̇yy[i,j]^2) + av_c(ε̇xy,i,j)^2)
-        args     = (; τII_old = τii0, dt=Δt)             
-        ηc[i,j] = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
-    end
-    # Vertices
-    @inbounds for j ∈ 2:size(ε̇xy,2)-1, i ∈ 2:size(ε̇xy,1)-1
-        τii0     = sqrt(0.5 * (av_v(τxx0,i,j)^2 + av_v(τyy0,i,j)^2) + τxy0[i,j]^2)
-        ε̇ii      = sqrt(0.5 * (av_v(ε̇xx,i,j)^2 + av_v(ε̇yy,i,j)^2) + ε̇xy[i,j]^2)
-        args     = (; τII_old = τii0, dt=Δt)
-        ηv[i,j]  = phase_viscosity(MatParam, ε̇ii, Phasev[i,j], args)
-    end
-end
 # 2D Stokes routine
 @views function Stokes2D_VE_inclusion(UseGeoParams)
     # Physics
+    do_DP   = true
     Lx, Ly  = 1.0, 1.0  # domain size
     ξ       = 10.0      # Maxwell relaxation time
     η0      = 1.0       # viscous viscosity
-    G       = 1.0       # elastic shear modulus
+    G0      = 1.0       # elastic shear modulus
     εbg     = 1.0       # background strain-rate
     radi    = 0.01
+    τ_y     = 1.6 
+    Gi      = G0/(6.0-4.0*do_DP)      # inclusion shear modulus
+    η_reg   = 1.2e-2            # regularisation "viscosity"
+    ϕ       = 30*do_DP          
+    Coh     = 1.6/cosd(ϕ)      # cohesion
+
+    pl = DruckerPrager_regularised(C=Coh, ϕ=30, η_vp=η_reg)        # non-regularized plasticity
+    # pl = DruckerPrager(C=1.0, ϕ=30)        # non-regularized plasticity
 
     MatParam = (SetMaterialParams(Name="Matrix"   , Phase=1,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=G),LinearViscous(η=η0))), 
-                SetMaterialParams(Name="Inclusion", Phase=2,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=G/6),LinearViscous(η=η0))),
-                )
+              CompositeRheology = CompositeRheology(ConstantElasticity(G=G0),LinearViscous(η=η0), pl)), 
+              SetMaterialParams(Name="Inclusion", Phase=2,
+              CompositeRheology = CompositeRheology(ConstantElasticity(G=Gi),LinearViscous(η=η0), pl)),
+              )
 
     # Numerics
     nt       = 10        # number of time steps
-    ncx, ncy = 31, 31    # numerical grid resolution
+    ncx, ncy = 61, 61    # numerical grid resolution
     ε        = 1e-6      # nonlinear tolerence
-    iterMax  = 1e4       # max number of iters
+    iterMax  = 100e3       # max number of iters
     nout     = 500       # check frequency
     # Iterative parameters -------------------------------------------
     Reopt    = 5π
@@ -89,7 +82,7 @@ end
     ρ        = cfl*Reopt/ncx
     # Preprocessing
     Δx, Δy   = Lx/ncx, Ly/ncy
-    Δt       = η0/(G*ξ + 1e-15) 
+    Δt       = η0/(G0*ξ + 1e-15) 
     # Array initialisation
     Pt       = zeros(Prec, ncx  ,ncy  )
     ∇V       = zeros(Prec, ncx  ,ncy  )
@@ -153,7 +146,7 @@ end
     # Time loop
     t=0.0; evo_t=Float64[]; evo_τxx=Float64[];
     global itg = 1
-    for it = 1:15
+    for it = 1:25
         iter=1; err=2*ε; err_evo1=Float64[]; err_evo2=Float64[]; 
         τxx0.=τxx; τyy0.=τyy; τxy0.=τxy
         while (err>ε && iter<=iterMax)
@@ -169,11 +162,11 @@ end
             ε̇xy   .= 0.5.*(diff(Vx, dims=2)./Δy .+ diff(Vy, dims=1)./Δx)  
             # Stresses
             if UseGeoParams
-                iter == 1 && viscosityGeoParams!(ηc, ηv, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
-                τxx   .= 2 .* ηc .* ε̇xx 
-                τyy   .= 2 .* ηc .* ε̇yy
-                τxy   .= 2 .* ηv .* ε̇xy
-                # UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
+                # iter == 1 && viscosityGeoParams!(ηc, ηv, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, MatParam, Δt, Phasec, Phasev )
+                # τxx   .= 2 .* ηc .* ε̇xx 
+                # τyy   .= 2 .* ηc .* ε̇yy
+                # τxy   .= 2 .* ηv .* ε̇xy
+                UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0, Pt, MatParam, Δt, Phasec, Phasev )
             else
                 τxx   .= 2 .* ηve_c .* ( ε̇xx .+ τxx0./(2 .* ηe_c) ) 
                 τyy   .= 2 .* ηve_c .* ( ε̇yy .+ τyy0./(2 .* ηe_c) )
@@ -206,20 +199,20 @@ end
             iter+=1; global itg=iter
         end
         t = t + Δt
-        # push!(evo_t, t); push!(evo_τxx, maximum(τxx))
+        push!(evo_t, t); push!(evo_τxx, maximum(τxx))
         # Plotting
-        # p1 = heatmap(xv, yc, Vx[:,2:end-1]', aspect_ratio=1, xlims=(0, Lx), ylims=(Δy/2, Ly-Δy/2), c=:inferno, title="Vx")
-        # p2 = heatmap(xc, yv, Vy[2:end-1,:]', aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="Vy")
-        # p3 = heatmap(xc, yc, Pt' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="P")
-        # # p3 = heatmap(xv, yv, τxy' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="τxy")
-        # p4 = plot(evo_t, evo_τxx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
-        # p4 = plot!(evo_t, 2.0.*εbg.*η0.*(1.0.-exp.(.-evo_t.*G./η0)), linewidth=2.0) # analytical solution
-        # display(plot(p1, p2, p3, p4))
+        p1 = heatmap(xv, yc, Vx[:,2:end-1]', aspect_ratio=1, xlims=(0, Lx), ylims=(Δy/2, Ly-Δy/2), c=:inferno, title="Vx")
+        p2 = heatmap(xc, yv, Vy[2:end-1,:]', aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="Vy")
+        p3 = heatmap(xc, yc, Pt' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="P")
+        # p3 = heatmap(xv, yv, τxy' , aspect_ratio=1, xlims=(Δx/2, Lx-Δx/2), ylims=(0, Ly), c=:inferno, title="τxy")
+        p4 = plot(evo_t, evo_τxx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
+        p4 = plot!(evo_t, 2.0.*εbg.*η0.*(1.0.-exp.(.-evo_t.*G./η0)), linewidth=2.0) # analytical solution
+        display(plot(p1, p2, p3, p4))
     end
     return
 end
 
-@time Stokes2D_VE_inclusion(false)
+# @time Stokes2D_VE_inclusion(false)
 # 2.701631 seconds (5.39 M allocations: 3.203 GiB, 11.96% gc time) # 15 its
 # 0.873773 seconds (2.76 M allocations: 1.641 GiB,  8.02% gc time) # 5 its
 
