@@ -6,6 +6,13 @@ Dat = Float64 # Precision (double=Float64 or single=Float32)
 @views av_xa(A) =  0.5*(A[1:end-1,:].+A[2:end,:])
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end]) 
 
+@inline function av_c(A, i, j)
+    return 0.25*(A[i,j] + A[i+1,j] + A[i,j+1] + A[i+1,j+1])
+end
+
+@inline function av_v(A, i, j)
+    return 0.25*(A[i,j] + A[i-1,j] + A[i,j-1] + A[i-1,j-1])
+end
 
 @views function average_c!(Ac::AbstractArray{N,T}, Av::AbstractArray{N,T}) where {N,T} # extrapolate vertex -> center
  
@@ -43,21 +50,21 @@ end
     average_c!(ε̇xy_c, ε̇xy)  # average vertices -> centers
 
     # Centroids
-    for j ∈ axes(ε̇xx,2), i ∈ axes(ε̇xx,1)
+    @inbounds for j ∈ axes(ε̇xx,2), i ∈ axes(ε̇xx,1)
         # compute second invariants from surrounding points
-        τii0     = second_invariant_staggered( (τxx0[i,j],τyy0[i,j]), (τxy0[i,j], τxy0[i+1,j], τxy0[i,j+1], τxy0[i+1,j+1])) 
-        ε̇ii      = second_invariant_staggered( (ε̇xx[i,j], ε̇yy[i,j] ), (ε̇xy[i,j],  ε̇xy[i+1,j],  ε̇xy[i,j+1],  ε̇xy[i+1,j+1])) 
-        args     = (; τII_old = τii0, dt=Δt, P=Pt[i,j])             
-        ηc[i,j]  = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
-        τxx[i,j]   = 2*ηc[i,j]*ε̇xx[i,j]
-        τyy[i,j]   = 2*ηc[i,j]*ε̇yy[i,j]
-        
-        τxy_c[i,j] = 2*ηc[i,j]*ε̇xy_c[i,j]
+        τii0     =  sqrt(0.5 *(τxx0[i,j]^2 + τyy0[i,j]^2) + av_c(τxy0,i,j)^2)
+        ε̇ii      =  sqrt(0.5 *( ε̇xx[i,j]^2 +  ε̇yy[i,j]^2) + av_c(ε̇xy,i,j)^2)
+
+        args       = (; τII_old = τii0, dt=Δt, P=Pt[i,j])             
+        η = ηc[i,j] = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
+        τxx[i,j]   = 2*η*ε̇xx[i,j]
+        τyy[i,j]   = 2*η*ε̇yy[i,j]
+        τxy_c[i,j] = 2*η*ε̇xy_c[i,j]
     end
     cen2ver!(ηv, ηc)    # extrapolate from centers -> vertices
 
     # Vertices
-    for j ∈ 2:size(ε̇xy,2)-1, i ∈ 2:size(ε̇xy,1)-1
+    @inbounds for j ∈ 2:size(ε̇xy,2)-1, i ∈ 2:size(ε̇xy,1)-1
         τxy[i,j] = 2*ηv[i,j]*ε̇xy[i,j] 
     end
 
@@ -305,6 +312,8 @@ end
     # Time loop
     t=0.0; evo_t=[]; evo_τxx=[];
     global itg = 1
+    global it_total = 0
+    
     for it = 1:nt
         iter=1; err=2*ε; err_evo1=[]; err_evo2=[]; 
         τxx0.=τxx; τyy0.=τyy; τxy0.=τxy
@@ -357,8 +366,9 @@ end
                 push!(err_evo1, err); push!(err_evo2, itg)
                 @printf("it = %03d, iter = %04d, err = %1.3e norm[Rx=%1.3e, Ry=%1.3e, ∇V=%1.3e] Fchk = %1.3e \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V, maximum(Fchk))
             end
-            iter+=1; global itg=iter
+            iter+=1; global itg = iter; 
         end
+        global it_total += itg
         t = t + Δt
         push!(evo_t, t); push!(evo_τxx, maximum(τxx))
       
@@ -379,12 +389,13 @@ end
             display(plot(p1, p2, p3, p4))
         end
     end
+    @show it_total
     return
 end
 
 for i=1:1
     println("step $i")
-    doPlots = true
+    doPlots = false
     @time Stokes2D_VE_inclusion(false, doPlots)
     @time Stokes2D_VE_inclusion(true, doPlots)
 end
