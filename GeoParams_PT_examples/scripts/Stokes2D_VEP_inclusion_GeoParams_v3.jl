@@ -71,10 +71,7 @@ end
         τyy[i,j]   = 2*η*ε̇yy[i,j]
         τxy_c[i,j] = 2*η*ε̇xy_c[i,j]
 
-       # τii[i,j]   = 2*η*ε̇ii                # mostly for debugging
-
-        τii[i,j]   = first(compute_τII(MatParam[Phasec[i,j]].CompositeRheology[1], ε̇ii, args))   
-
+        τii[i,j]   = 2*η*ε̇ii                # mostly for debugging
     end
     cen2ver!(ηv, ηc)    # extrapolate from centers -> vertices
 
@@ -185,7 +182,7 @@ end
 # 2D Stokes routine
 @views function Stokes2D_VE_inclusion(UseGeoParams, doPlot = false)
     # Physics
-    do_DP   = false
+    do_DP   = true
     Lx, Ly  = 1.0, 1.0  # domain size
     ξ       = 10.0      # Maxwell relaxation time
     η0      = 1.0       # viscous viscosity
@@ -310,8 +307,8 @@ end
     # For non-geoparams version
     Phasec[radc.<radi] .= 2
     Phasev[radv.<radi] .= 2
-    ηe_c[radc.<radi]   .= Δt*G/6.0
-    ηe_v[radv.<radi]   .= Δt*G/6.0
+    ηe_c[radc.<radi]   .= Δt*(G0/(6.0-4.0*do_DP))
+    ηe_v[radv.<radi]   .= Δt*(G0/(6.0-4.0*do_DP))
     ηve_c              .= (1.0./ηe_c .+ 1.0./η).^(-1)
     ηve_v              .= (1.0./ηe_v .+ 1.0./η).^(-1)
     ηc                 .= ηve_c
@@ -358,7 +355,7 @@ end
             if UseGeoParams
                 UpdateStressGeoParams!( ηc, ηv, τii, τxx, τyy, τxy, τxy_c, ε̇xx, ε̇yy, ε̇xy, ε̇xy_c, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, Pt, MatParam, Δt, Phasec, Phasev )
 
-                if 1==1
+                if 1==0
                     # for debugging: do the exact same with the "native" routine and check that the values are identical
 
                     # Do the same calculation with native routine
@@ -374,7 +371,7 @@ end
                     error_ηv  = norm(ηv .- ηv_check)
                     
                     if norm(error_τii)>1e-10
-                        @show error_τii, error_τxx, error_τxy, error_ηc, error_ηv τii[100]-τii_check[100]
+                        @show error_τii, error_τxx, error_τxy, error_ηc, error_ηv τii[100]-τii_check[100], F[100]
                         error("stop - difference too large")
                     end
 
@@ -445,7 +442,7 @@ end
 
 for i=1:1
     println("step $i")
-    doPlots = true
-   # @time Stokes2D_VE_inclusion(false, doPlots)
+    doPlots = false
+    @time Stokes2D_VE_inclusion(false, doPlots)
     @time Stokes2D_VE_inclusion(true, doPlots)
 end
