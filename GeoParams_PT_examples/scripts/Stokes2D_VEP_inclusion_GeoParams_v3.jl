@@ -1,6 +1,6 @@
 # Initialisation
 using Plots, Printf, Statistics, LinearAlgebra, GeoParams
-Dat = Float64 # Precision (double=Float64 or single=Float32)
+const Dat = Float64 # Precision (double=Float64 or single=Float32)
 # Macros
 @views    av(A) = 0.25*(A[1:end-1,1:end-1].+A[2:end,1:end-1].+A[1:end-1,2:end].+A[2:end,2:end])
 @views av_xa(A) =  0.5*(A[1:end-1,:].+A[2:end,:])
@@ -10,15 +10,24 @@ Dat = Float64 # Precision (double=Float64 or single=Float32)
     return 0.25*(A[i,j] + A[i+1,j] + A[i,j+1] + A[i+1,j+1])
 end
 
+# Average square of the 4 vertex points
+@inline function av2_c(A, i, j)
+    return 0.25*(A[i,j]^2 + A[i+1,j]^2 + A[i,j+1]^2 + A[i+1,j+1]^2)
+end
+
 @inline function av_v(A, i, j)
     return 0.25*(A[i,j] + A[i-1,j] + A[i,j-1] + A[i-1,j-1])
 end
 
+@inline function av2_v(A, i, j)
+    return 0.25*(A[i,j]^2 + A[i-1,j]^2 + A[i,j-1]^2 + A[i-1,j-1]^2)
+end
+
+
 @views function average_c!(Ac::AbstractArray{N,T}, Av::AbstractArray{N,T}) where {N,T} # extrapolate vertex -> center
  
-    for I in CartesianIndices(Ac)
-        i,j = I[1], I[2];
-        Ac[I] = 0.25*(Av[i,j] + Av[i+1,j] + Av[i,j+1] + Av[i+1,j+1])
+    for j ∈ axes(Ac,2), i ∈ axes(Ac,1)
+        Ac[i,j] = av_c(Av,i,j)
     end
 
     return nothing
@@ -41,7 +50,7 @@ end
     end
 end
 # Rheology
-@views function UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, τxy_c, ε̇xx, ε̇yy, ε̇xy, ε̇xy_c, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, Pt, MatParam, Δt, Phasec, Phasev )
+@views function UpdateStressGeoParams!( ηc, ηv,  τii, τxx, τyy, τxy, τxy_c, ε̇xx, ε̇yy, ε̇xy, ε̇xy_c, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, Pt, MatParam, Δt, Phasec, Phasev )
     # ε̇iic                   .= sqrt.(1//2 .*(ε̇xx.^2 .+ ε̇yy.^2) .+ av(ε̇xy).^2)
     # ε̇iiv[2:end-1,2:end-1]  .= sqrt.(1//2 .*( av(ε̇xx).^2 .+ av(ε̇yy).^2) .+ ε̇xy[2:end-1,2:end-1].^2)
     # τii0c                  .= sqrt.(1//2 .*(τxx0.^2 .+ τyy0.^2) .+ av(τxy0).^2)
@@ -52,22 +61,30 @@ end
     # Centroids
     @inbounds for j ∈ axes(ε̇xx,2), i ∈ axes(ε̇xx,1)
         # compute second invariants from surrounding points
-        τii0     =  sqrt(0.5 *(τxx0[i,j]^2 + τyy0[i,j]^2) + av_c(τxy0,i,j)^2)
-        ε̇ii      =  sqrt(0.5 *( ε̇xx[i,j]^2 +  ε̇yy[i,j]^2) + av_c(ε̇xy,i,j)^2)
+        τii0     =  sqrt(0.5 *(τxx0[i,j]^2 + τyy0[i,j]^2) + av2_c(τxy0,i,j))
+        ε̇ii      =  sqrt(0.5 *( ε̇xx[i,j]^2 +  ε̇yy[i,j]^2) + av2_c(ε̇xy,i,j))
 
         args       = (; τII_old = τii0, dt=Δt, P=Pt[i,j])             
+        
         η = ηc[i,j] = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
         τxx[i,j]   = 2*η*ε̇xx[i,j]
         τyy[i,j]   = 2*η*ε̇yy[i,j]
         τxy_c[i,j] = 2*η*ε̇xy_c[i,j]
+
+       # τii[i,j]   = 2*η*ε̇ii                # mostly for debugging
+
+        τii[i,j]   = first(compute_τII(MatParam[Phasec[i,j]].CompositeRheology[1], ε̇ii, args))   
+
     end
     cen2ver!(ηv, ηc)    # extrapolate from centers -> vertices
 
     # Vertices
-    @inbounds for j ∈ 2:size(ε̇xy,2)-1, i ∈ 2:size(ε̇xy,1)-1
-        τxy[i,j] = 2*ηv[i,j]*ε̇xy[i,j] 
-    end
+   # @inbounds for j ∈ 2:size(ε̇xy,2)-1, i ∈ 2:size(ε̇xy,1)-1
+   #     τxy[i,j] = 2*ηv[i,j]*ε̇xy[i,j] 
+   # end
+    cen2ver!(τxy, τxy_c)    # extrapolate from centers -> vertices
 
+    
     return nothing
 end
 
@@ -85,14 +102,13 @@ end
     ε̇ii, τii, τii0, ε̇xy_c, τxy_c,ε̇xy2_c, τxy2_c, F, τ_y, Pt, sinϕ, η_reg, Pla, λ, ε̇ii_pl, Fchk, ηc, ηv)
     
     # visco-elastic strain rates
-    average_c!(τxy2_c, τxy0.^2)
-    average_c!(ε̇xy2_c, ε̇xy.^2)
+    average_c!(τxy2_c, τxy0.^2)     # average squares!
+    average_c!(ε̇xy2_c, ε̇xy.^2 )
     
-    τii0   .=  sqrt.( 0.5.*(τxx0.^2 .+ τyy0.^2) .+ τxy2_c) # watch out - name is misleading
-    ε̇ii    .=  sqrt.( 0.5.*(ε̇xx.^2 .+ ε̇yy.^2) .+ ε̇xy2_c)  # strain rate invariant @ center
-    τii    .=  2.0.*ηve_c.*(ε̇ii .+ τii0./(2.0.*ηe_c) )       # trial stress
+    τii0   .=  sqrt.( 0.5.*(τxx0.^2 .+ τyy0.^2) .+ τxy2_c)  # old stress invariant @ cente
+    ε̇ii    .=  sqrt.( 0.5.*(ε̇xx.^2 .+ ε̇yy.^2) .+ ε̇xy2_c)    # strain rate invariant @ center
+    τii    .=  2.0.*ηve_c.*(ε̇ii .+ τii0./(2.0.*ηe_c) )      # trial stress
    
-    #ε̇xy_c  .= av(ε̇xy)
     average_c!(ε̇xy_c, ε̇xy)
 
     # Compute plasticity @ center
@@ -111,9 +127,9 @@ end
     τxy_c   .=  2.0.*ηc.*ε̇xy_c 
 
     cen2ver!(ηv, ηc)                # extrapolate from centers -> vertices
+    cen2ver!(τxy, τxy_c)                # extrapolate from centers -> vertices
 
-    τxy     .=  2.0.*ηv.*ε̇xy        # update stress @ vertexes
-
+#    τxy     .=  2.0.*ηv.*ε̇xy        # update stress @ vertexes
 
     return nothing
 end
@@ -134,6 +150,7 @@ end
     τyy    .= 2.0.*ηve_c.*ε̇yy1
     τxy_c  .= 2.0.*ηve_c.*ε̇xy1_c
     τii    .= sqrt.(0.5*(τxx.^2 .+ τyy.^2) .+ τxy_c.^2)
+    
     
     # yield function
     F      .= τii .- τ_y .- Pt.*sinϕ
@@ -161,7 +178,6 @@ end
    # τyy   .= 2 .* ηve_c .* ( ε̇yy .+ τyy0./(2 .* ηe_c) )
    # τxy   .= 2 .* ηve_v .* ( ε̇xy1 )
 
-
     return nothing
 end
 
@@ -178,7 +194,7 @@ end
     radi    = 0.01
     τ_y     = 1.6
     Gi      = G0/(6.0-4.0*do_DP)      # inclusion shear modulus
-    η_reg   = 1.2e-2            # regularisation "viscosity"
+    η_reg   = 2*1.2e-2            # regularisation "viscosity"
     ϕ       = 30*do_DP    
     sinϕ    = sind(ϕ)*do_DP      
     Coh     = τ_y/cosd(ϕ)      # cohesion
@@ -199,7 +215,7 @@ end
     #ncx, ncy = 63, 63    # numerical grid resolution
     
     ε        = 1e-6      # nonlinear tolerence
-    iterMax  = 1e4       # max number of iters
+    iterMax  = 1e5       # max number of iters
     nout     = 500       # check frequency
     # Iterative parameters -------------------------------------------
     Reopt    = 5π
@@ -303,6 +319,15 @@ end
 
     ηc1 = copy(ηc)
     ηv1 = copy(ηv)
+
+
+    # for checking 
+    ηc_check = zeros(size(ηc))
+    ηv_check = zeros(size(ηv))
+    τii_check      = zeros(size(τii))
+    τxx_check      = zeros(size(τxx))
+    τyy_check      = zeros(size(τyy))
+    τxy_check      = zeros(size(τxy))
     
     # Velocity
     (Xvx,Yvx) = ([x for x=xv,y=yce], [y for x=xv,y=yce])
@@ -328,11 +353,35 @@ end
             ε̇xx   .= diff(Vx[:,2:end-1], dims=1)./Δx .- 1.0/3.0*∇V
             ε̇yy   .= diff(Vy[2:end-1,:], dims=2)./Δy .- 1.0/3.0*∇V
             ε̇xy   .= 0.5.*(diff(Vx, dims=2)./Δy .+ diff(Vy, dims=1)./Δx)  
+            
             # Stresses
             if UseGeoParams
-                #UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, τxy_c, ε̇xx, ε̇yy, ε̇xy, ε̇xy_c, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, Pt, MatParam, Δt, Phasec, Phasev )
-                UpdateStressGeoParams!( ηc, ηv, τxx, τyy, τxy, τxy_c, ε̇xx, ε̇yy, ε̇xy, ε̇xy_c, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, Pt, MatParam, Δt, Phasec, Phasev )
+                UpdateStressGeoParams!( ηc, ηv, τii, τxx, τyy, τxy, τxy_c, ε̇xx, ε̇yy, ε̇xy, ε̇xy_c, ε̇iic, ε̇iiv, τxx0, τyy0, τxy0, τii0c, τii0v, Pt, MatParam, Δt, Phasec, Phasev )
 
+                if 1==1
+                    # for debugging: do the exact same with the "native" routine and check that the values are identical
+
+                    # Do the same calculation with native routine
+                    UpdateStressNative_VEP_invariants!(ηe_c, ηe_v, ηve_c, ηve_v, τxx_check, τyy_check, τxy_check, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0,
+                        ε̇ii, τii_check, τii0, ε̇xy_c, τxy_c, ε̇xy2_c, τxy2_c, F, τ_y, Pt, sinϕ, η_reg, Pla, λ, ε̇ii_pl, Fchk, ηc_check, ηv_check)
+
+                    #UpdateStressNative_VE!(ηe_c, ηe_v, ηve_c, ηve_v, τxx_check, τyy_check, τxy_check, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0)
+                
+                    error_τii = norm(τii .- τii_check)
+                    error_τxx = norm(τxx .- τxx_check)
+                    error_τxy = norm(τxy .- τxy_check)
+                    error_ηc  = norm(ηc .- ηc_check)
+                    error_ηv  = norm(ηv .- ηv_check)
+                    
+                    if norm(error_τii)>1e-10
+                        @show error_τii, error_τxx, error_τxy, error_ηc, error_ηv τii[100]-τii_check[100]
+                        error("stop - difference too large")
+                    end
+
+                    if mod(iter, nout)==0
+                        @show error_τii, error_τxx, error_τxy, error_ηc, error_ηv τii[100]-τii_check[100]
+                    end
+                end
             else
                 #UpdateStressNative_VE!(ηe_c, ηe_v, ηve_c, ηve_v, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0)
                 #UpdateStressNative_VEP!(ηe_c, ηe_v, ηve_c, ηve_v, τxx, τyy, τxy, ε̇xx, ε̇yy, ε̇xy, τxx0, τyy0, τxy0,
@@ -368,10 +417,11 @@ end
             end
             iter+=1; global itg = iter; 
         end
+       # error("stop here")
+
         global it_total += itg
         t = t + Δt
         push!(evo_t, t); push!(evo_τxx, maximum(τxx))
-      
         if doPlot
             # Plotting
             #p1 = heatmap(xv, yc, Vx[:,2:end-1]', aspect_ratio=1, xlims=(0, Lx), ylims=(Δy/2, Ly-Δy/2), c=:inferno, title="Vx")
@@ -395,7 +445,7 @@ end
 
 for i=1:1
     println("step $i")
-    doPlots = false
-    @time Stokes2D_VE_inclusion(false, doPlots)
+    doPlots = true
+   # @time Stokes2D_VE_inclusion(false, doPlots)
     @time Stokes2D_VE_inclusion(true, doPlots)
 end
