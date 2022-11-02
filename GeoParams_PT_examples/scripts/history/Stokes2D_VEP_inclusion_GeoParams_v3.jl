@@ -208,14 +208,14 @@ end
 
     # Numerics
     nt       = 20        # number of time steps
-    ncx, ncy = 31, 31    # numerical grid resolution
-    #ncx, ncy = 63, 63    # numerical grid resolution
+    # ncx, ncy = 31, 31    # numerical grid resolution
+    ncx, ncy = 63, 63    # numerical grid resolution
     
     ε        = 1e-6      # nonlinear tolerence
     iterMax  = 1e5       # max number of iters
     nout     = 500       # check frequency
     # Iterative parameters -------------------------------------------
-    Reopt    = 5π
+    Reopt    = 4π
     cfl      = 0.50
     ρ        = cfl*Reopt/ncx
     # Preprocessing
@@ -442,7 +442,7 @@ end
 
 for i=1:1
     println("step $i")
-    doPlots = false
+    doPlots = true
     @time Stokes2D_VE_inclusion(false, doPlots)
-    @time Stokes2D_VE_inclusion(true, doPlots)
+    # @time Stokes2D_VE_inclusion(true, doPlots)
 end
