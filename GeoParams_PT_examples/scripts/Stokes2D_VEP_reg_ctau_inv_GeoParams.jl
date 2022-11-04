@@ -11,6 +11,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     pl_correction = :native_naïve
     pl_correction = :native_inv1
     pl_correction = :native_inv2
+    pl_correction = :native_inv3
     
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     η_reg   = 8.0e-3             # regularisation "viscosity"
@@ -68,6 +69,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Txyv_o  = zeros(Dat, nx+1,ny+1)
     Tii     = zeros(Dat, nx  ,ny  )
     Eii     = zeros(Dat, nx  ,ny  )
+    Eii_f   = zeros(Dat, nx  ,ny  )
     F       = zeros(Dat, nx  ,ny  )
     Fchk    = zeros(Dat, nx  ,ny  )
     Pla     = zeros(Dat, nx  ,ny  )
@@ -91,6 +93,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     η_vev    =      ones(Dat, nx+1, ny+1)
     η_vep   =       ones(Dat, nx, ny)
     η_vepv  =       ones(Dat, nx+1, ny+1)
+    ηc      = ones(Dat,nx,ny)
     Phasec  = ones(Int, nx  ,ny  )
     # Initial condition
     xc, yc  = LinRange(dx/2, Lx-dx/2, nx), LinRange(dy/2, Ly-dy/2, ny)
@@ -204,8 +207,26 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
                 Txy    .= Txy .- η_ve.*λ.*Txy./Tii # Here we need the component for centroid update
                 Tii    .= Tii .- η_ve.*λ
                 η_vep  .= Tii./2.0./Eii
+
+            elseif pl_correction == :native_inv3
+                # Invariants
+                Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ av(Exyv1.^2))
+                Tii    .= 2.0.*η_ve.*Eii
+
+                # yield function
+                F      .= Tii .- τ_y .- Pt.*sinϕ
+                Pla    .= 0.0
+                Pla    .= F .> 0.0
+                λ      .= Pla.*F./(η_ve .+ η_reg)
+                Tii    .= Tii .- η_ve.*λ        # correct invariant
+                Fchk   .= Tii .- τ_y .- Pt.*sinϕ .- λ.*η_reg
+
+                η_vep  .= Tii./2.0./Eii
+                Txx    .= 2*η_vep.*Exx1         
+                Tyy    .= 2*η_vep.*Eyy1
+                Txy    .= 2*η_vep.*Exy1
             end
-            Txyv[2:end-1,2:end-1].=av(Txy) # Txyv=0 on boundaries !
+            Txyv[2:end-1,2:end-1].=av(Txy)      # Txyv=0 on boundaries !
             # PT timestep
             dtVx   .= min(dx,dy)^2.0./av_xa(η_vep)./4.1./Vsc
             dtVy   .= min(dx,dy)^2.0./av_ya(η_vep)./4.1./Vsc
