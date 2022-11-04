@@ -10,6 +10,8 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
 @views function Stokes2D_vep(UseGeoParams)
     pl_correction = :native_naïve
     pl_correction = :native_inv1
+    pl_correction = :native_inv2
+    
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     η_reg   = 8.0e-3             # regularisation "viscosity"
     # Physics
@@ -82,9 +84,11 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     dtVy    = zeros(Dat, nx  ,ny-1)
     Rog     = zeros(Dat, nx  ,ny  )
     η_v     =    μ0*ones(Dat, nx, ny)
+    η_vv    =    μ0*ones(Dat, nx+1, ny+1)
     η_e     = dt*G0*ones(Dat, nx, ny)
     η_ev    = dt*G0*ones(Dat, nx+1, ny+1)
     η_ve    =       ones(Dat, nx, ny)
+    η_vev    =      ones(Dat, nx+1, ny+1)
     η_vep   =       ones(Dat, nx, ny)
     η_vepv  =       ones(Dat, nx+1, ny+1)
     Phasec  = ones(Int, nx  ,ny  )
@@ -100,6 +104,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     η_ev[radv.<radi]   .= dt*Gi
     Phasec[radc.<radi] .= 2
     η_ve    .= (1.0./η_e + 1.0./η_v).^-1
+    η_vev   .= (1.0./η_ev + 1.0./η_vv).^-1
     Vx      .=   εbg.*Xvx
     Vy      .= .-εbg.*Yvy
     # Time loop
@@ -172,10 +177,32 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
                 Pla    .= 0.0
                 Pla    .= F .> 0.0
                 λ      .= Pla.*F./(η_ve .+ η_reg)
-                Fchk   .= (Tii .- η_ve.*λ) .- τ_y .- Pt.*sinϕ .- λ.*η_reg
+                Fchk   .= (Tii .- η_ve.*λ)  .- τ_y .- Pt.*sinϕ .- λ.*η_reg
                 Txx    .= 2.0.*η_ve.*(Exx1 .- 0.5.*λ.*Txx./Tii)
-                Tyy    .= 2.0.*η_ve.*(Eyy1 .- 0.5.*λ.*Txx./Tii)
+                Tyy    .= 2.0.*η_ve.*(Eyy1 .- 0.5.*λ.*Tyy./Tii)
                 Txy    .= 2.0.*η_ve.*(Exy1 .- 0.5.*λ.*Txy./Tii) # Here we need the component for centroid update
+                Tii    .= Tii .- η_ve.*λ
+                η_vep  .= Tii./2.0./Eii
+
+            elseif pl_correction == :native_inv2
+                # trial stress
+                Txx    .= 2.0.*η_ve.*Exx1
+                Tyy    .= 2.0.*η_ve.*Eyy1
+                Txyv   .= 2.0.*η_vev.*Exyv1
+                Txy    .= av(Txyv)
+                # Invariants
+                Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ av(Exyv1.^2))
+                Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ av(Txyv.^2))
+                # yield function
+                F      .= Tii .- τ_y .- Pt.*sinϕ
+                Pla    .= 0.0
+                Pla    .= F .> 0.0
+                λ      .= Pla.*F./(η_ve .+ η_reg)
+                Fchk   .= (Tii .- η_ve.*λ) .- τ_y .- Pt.*sinϕ .- λ.*η_reg
+                Txx    .= Txx .- η_ve.*λ.*Txx./Tii
+                Tyy    .= Tyy .- η_ve.*λ.*Tyy./Tii
+                Txy    .= Txy .- η_ve.*λ.*Txy./Tii # Here we need the component for centroid update
+                Tii    .= Tii .- η_ve.*λ
                 η_vep  .= Tii./2.0./Eii
             end
             Txyv[2:end-1,2:end-1].=av(Txy) # Txyv=0 on boundaries !
