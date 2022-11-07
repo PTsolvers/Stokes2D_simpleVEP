@@ -1,17 +1,31 @@
 # Initialisation
 using Plots, Printf, Statistics, LinearAlgebra, GeoParams
-Dat = Float64  # Precision (double=Float64 or single=Float32)
+const Dat = Float64  # Precision (double=Float64 or single=Float32)
 # Macros
 @views    av(A) = 0.25*(A[1:end-1,1:end-1].+A[2:end,1:end-1].+A[1:end-1,2:end].+A[2:end,2:end])
 @views   av2(A) = 0.25*(A[1:end-1,1:end-1].^2 .+ A[2:end,1:end-1].^2 .+ A[1:end-1,2:end].^2 .+ A[2:end,2:end].^2)
 @views av_xa(A) =  0.5*(A[1:end-1,:].+A[2:end,:])
 @views av_ya(A) =  0.5*(A[:,1:end-1].+A[:,2:end])
+
+function update_stress_GP!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txy_o, Exx, Eyy, Exy, η_vep, Pt, Phasec, MatParam, dt)
+    @inbounds for j ∈ axes(Exx,2), i ∈ axes(Exx,1)
+        # compute second invariants from surrounding points
+        args = (; dt=dt, P=Pt[i,j])             
+        εij = (Exx[i,j], Eyy[i,j], Exy[i,j])
+        τij_o = (Txx_o[i,j], Tyy_o[i,j], Txy_o[i,j])
+        Tij, Tii[i,j], η_vep[i,j] = compute_τij(MatParam, εij, args, τij_o, Phasec[i,j])
+        Txx[i,j] = Tij[1]
+        Tyy[i,j] = Tij[2]
+        Txy[i,j] = Tij[3]
+    end
+end
+
 # 2D Stokes routine
-@views function Stokes2D_vep(UseGeoParams)
-    pl_correction = :native_naïve
-    pl_correction = :native_inv1
-    pl_correction = :native_inv2
-    pl_correction = :native_inv3
+function Stokes2D_vep(UseGeoParams, nt)
+    pl_correction = :native_naive
+    # pl_correction = :native_inv1
+    # pl_correction = :native_inv2
+    # pl_correction = :native_inv3
     
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     η_reg   = 8.0e-3             # regularisation "viscosity"
@@ -26,6 +40,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Gi      = G0/(6.0-4.0*do_DP) # elastic shear modulus perturbation
     εbg     = 1.0                # background strain-rate
     Coh     = τ_y/cosd(ϕ)        # cohesion
+    # Coh     = Inf
     # Geoparams initialisation
     pl = DruckerPrager_regularised(C=Coh, ϕ=ϕ, η_vp=η_reg)        # non-regularized plasticity
     MatParam = (SetMaterialParams(Name="Matrix"   , Phase=1,
@@ -34,7 +49,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
                 CompositeRheology = CompositeRheology(ConstantElasticity(G=Gi),LinearViscous(η=μ0),pl)),
                 )
     # Numerics
-    nt      = 10                 # number of time steps
+    # nt      = 10                 # number of time steps
     nx, ny  = 63, 63             # numerical grid resolution
     Vdmp    = 4.0                # convergence acceleration (damping)
     Vsc     = 2.0                # iterative time step limiter
@@ -111,9 +126,9 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Vx      .=   εbg.*Xvx
     Vy      .= .-εbg.*Yvy
     # Time loop
-    t=0.0; evo_t=[]; evo_Txx=[]
+    t=0.0; evo_t=Float64[]; evo_Txx=Float64[]
     for it = 1:nt
-        iter=1; err=2*ε; err_evo1=[]; err_evo2=[]
+        iter=1; err=2*ε; err_evo1=Float64[]; err_evo2=Float64[]
         Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv; λ.=0.0
         local itg
         while (err>ε && iter<=iterMax)
@@ -131,100 +146,102 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             Exy1   .=    Exy   .+ Txy_o  ./2.0./η_e # like this?
             Exyv1  .=    Exyv  .+ Txyv_o ./2.0./η_ev
             Exy1   .= av(Exyv1)                    # or like that?
-            # if UseGeoParams
-            #     @inbounds for j ∈ axes(Exx,2), i ∈ axes(Exx,1)
-            #         # compute second invariants from surrounding points
-            #         τii0       =  sqrt(0.5 *(Txx_o[i,j]^2 + Tyy_o[i,j]^2) + Txy_o[i,j]^2)
-            #         ε̇ii        =  sqrt(0.5 *( Exx[i,j]^2 +  Eyy[i,j]^2) + Exy[i,j]^2)
-            #         args       = (; τII_old = τii0, dt=dt, P=Pt[i,j])             
-            #         η_vep[i,j] = phase_viscosity(MatParam, ε̇ii, Phasec[i,j], args)
-            #         Txx[i,j]   = 2*η_vep[i,j]*Exx[i,j]
-            #         Tyy[i,j]   = 2*η_vep[i,j]*Eyy[i,j]
-            #         Txy[i,j]   = 2*η_vep[i,j]*Exy[i,j]
-            #         Tii[i,j]   = 2*η_vep[i,j]*ε̇ii      # mostly for debugging
-            #         η_vep[i,j] = Txx[i,j]/2/Exx1[i,j]  # should be same as native?
-            # end
-            if pl_correction == :native_naïve
-                # Effective strain rate invariant
-                Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ Exy1.^2)
-                # trial stress
-                Txx    .= 2.0.*η_ve.*Exx1
-                Tyy    .= 2.0.*η_ve.*Eyy1
-                Txy    .= 2.0.*η_ve.*Exy1
-                Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
-                # yield function
-                F      .= Tii .- τ_y .- Pt.*sinϕ
-                Pla    .= 0.0
-                Pla    .= F .> 0.0
-                λ      .= Pla.*F./(η_ve .+ η_reg)
-                dQdTxx .= 0.5.*Txx./Tii
-                dQdTyy .= 0.5.*Tyy./Tii
-                dQdTxy .=      Txy./Tii
-                # plastic corrections
-                Txx    .= 2.0.*η_ve.*(Exx1 .-      λ.*dQdTxx)
-                Tyy    .= 2.0.*η_ve.*(Eyy1 .-      λ.*dQdTyy)
-                Txy    .= 2.0.*η_ve.*(Exy1 .- 0.5.*λ.*dQdTxy)
-                Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
-                Fchk   .= Tii .- τ_y .- Pt.*sinϕ .- λ.*η_reg
-                η_vep  .= Tii./2.0./Eii
-            elseif pl_correction == :native_inv1
-                # trial stress
-                Txx    .= 2.0.*η_ve.*Exx1
-                Tyy    .= 2.0.*η_ve.*Eyy1
-                Txy    .= 2.0.*η_ve.*Exy1
-                # Effective strain rate invariant
-                Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ Exy1.^2)
-                Tii    .= 2.0.*η_ve.*Eii
-                # yield function
-                F      .= Tii .- τ_y .- Pt.*sinϕ
-                Pla    .= 0.0
-                Pla    .= F .> 0.0
-                λ      .= Pla.*F./(η_ve .+ η_reg)
-                Fchk   .= (Tii .- η_ve.*λ)  .- τ_y .- Pt.*sinϕ .- λ.*η_reg
-                Txx    .= 2.0.*η_ve.*(Exx1 .- 0.5.*λ.*Txx./Tii)
-                Tyy    .= 2.0.*η_ve.*(Eyy1 .- 0.5.*λ.*Tyy./Tii)
-                Txy    .= 2.0.*η_ve.*(Exy1 .- 0.5.*λ.*Txy./Tii) # Here we need the component for centroid update
-                Tii    .= Tii .- η_ve.*λ
-                η_vep  .= Tii./2.0./Eii
-
-            elseif pl_correction == :native_inv2
-                # trial stress
-                Txx    .= 2.0.*η_ve.*Exx1
-                Tyy    .= 2.0.*η_ve.*Eyy1
-                Txyv   .= 2.0.*η_vev.*Exyv1
-                Txy    .= av(Txyv)
-                # Invariants
-                Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ av(Exyv1.^2))
-                Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ av(Txyv.^2))
-                # yield function
-                F      .= Tii .- τ_y .- Pt.*sinϕ
-                Pla    .= 0.0
-                Pla    .= F .> 0.0
-                λ      .= Pla.*F./(η_ve .+ η_reg)
-                Fchk   .= (Tii .- η_ve.*λ) .- τ_y .- Pt.*sinϕ .- λ.*η_reg
-                Txx    .= Txx .- η_ve.*λ.*Txx./Tii
-                Tyy    .= Tyy .- η_ve.*λ.*Tyy./Tii
-                Txy    .= Txy .- η_ve.*λ.*Txy./Tii # Here we need the component for centroid update
-                Tii    .= Tii .- η_ve.*λ
-                η_vep  .= Tii./2.0./Eii
-
-            elseif pl_correction == :native_inv3
-                # Invariants
-                Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ av(Exyv1.^2))
-                Tii    .= 2.0.*η_ve.*Eii
-
-                # yield function
-                F      .= Tii .- τ_y .- Pt.*sinϕ
-                Pla    .= 0.0
-                Pla    .= F .> 0.0
-                λ      .= Pla.*F./(η_ve .+ η_reg)
-                Tii    .= Tii .- η_ve.*λ        # correct invariant
-                Fchk   .= Tii .- τ_y .- Pt.*sinϕ .- λ.*η_reg
-
-                η_vep  .= Tii./2.0./Eii
-                Txx    .= 2*η_vep.*Exx1         
-                Tyy    .= 2*η_vep.*Eyy1
-                Txy    .= 2*η_vep.*Exy1
+            if UseGeoParams
+                update_stress_GP!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txy_o, Exx, Eyy, Exy, η_vep, Pt, Phasec, MatParam, dt)
+                # @inbounds for j ∈ axes(Exx,2), i ∈ axes(Exx,1)
+                #     # compute second invariants from surrounding points
+                #     args = (; dt=dt, P=Pt[i,j])             
+                #     εij = (Exx[i,j], Eyy[i,j], Exy[i,j])
+                #     τij_o = (Txx_o[i,j], Tyy_o[i,j], Txy_o[i,j])
+                #     Tij, Tii[i,j], η_vep[i,j] = compute_τij(MatParam, εij, args, τij_o, Phasec[i,j])
+                #     Txx[i,j] = Tij[1]
+                #     Tyy[i,j] = Tij[2]
+                #     Txy[i,j] = Tij[3]
+                #     # η_vep[i,j] = Txx[i,j]/2/Exx1[i,j]  # should be same as native?
+                # end
+            else
+                if pl_correction == :native_naive
+                    # Effective strain rate invariant
+                    Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ Exy1.^2)
+                    # trial stress
+                    Txx    .= 2.0.*η_ve.*Exx1
+                    Tyy    .= 2.0.*η_ve.*Eyy1
+                    Txy    .= 2.0.*η_ve.*Exy1
+                    Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
+                    # yield function
+                    F      .= Tii .- τ_y .- Pt.*sinϕ
+                    Pla    .= 0.0
+                    Pla    .= F .> 0.0
+                    λ      .= Pla.*F./(η_ve .+ η_reg)
+                    dQdTxx .= 0.5.*Txx./Tii
+                    dQdTyy .= 0.5.*Tyy./Tii
+                    dQdTxy .=      Txy./Tii
+                    # plastic corrections
+                    Txx    .= 2.0.*η_ve.*(Exx1 .-      λ.*dQdTxx)
+                    Tyy    .= 2.0.*η_ve.*(Eyy1 .-      λ.*dQdTyy)
+                    Txy    .= 2.0.*η_ve.*(Exy1 .- 0.5.*λ.*dQdTxy)
+                    Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
+                    Fchk   .= Tii .- τ_y .- Pt.*sinϕ .- λ.*η_reg
+                    η_vep  .= Tii./2.0./Eii
+                elseif pl_correction == :native_inv1
+                    # trial stress
+                    Txx    .= 2.0.*η_ve.*Exx1
+                    Tyy    .= 2.0.*η_ve.*Eyy1
+                    Txy    .= 2.0.*η_ve.*Exy1
+                    # Effective strain rate invariant
+                    Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ Exy1.^2)
+                    Tii    .= 2.0.*η_ve.*Eii
+                    # yield function
+                    F      .= Tii .- τ_y .- Pt.*sinϕ
+                    Pla    .= 0.0
+                    Pla    .= F .> 0.0
+                    λ      .= Pla.*F./(η_ve .+ η_reg)
+                    Fchk   .= (Tii .- η_ve.*λ)  .- τ_y .- Pt.*sinϕ .- λ.*η_reg
+                    Txx    .= 2.0.*η_ve.*(Exx1 .- 0.5.*λ.*Txx./Tii)
+                    Tyy    .= 2.0.*η_ve.*(Eyy1 .- 0.5.*λ.*Tyy./Tii)
+                    Txy    .= 2.0.*η_ve.*(Exy1 .- 0.5.*λ.*Txy./Tii) # Here we need the component for centroid update
+                    Tii    .= Tii .- η_ve.*λ
+                    η_vep  .= Tii./2.0./Eii
+    
+                elseif pl_correction == :native_inv2
+                    # trial stress
+                    Txx    .= 2.0.*η_ve.*Exx1
+                    Tyy    .= 2.0.*η_ve.*Eyy1
+                    Txyv   .= 2.0.*η_vev.*Exyv1
+                    Txy    .= av(Txyv)
+                    # Invariants
+                    Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ av(Exyv1.^2))
+                    Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ av(Txyv.^2))
+                    # yield function
+                    F      .= Tii .- τ_y .- Pt.*sinϕ
+                    Pla    .= 0.0
+                    Pla    .= F .> 0.0
+                    λ      .= Pla.*F./(η_ve .+ η_reg)
+                    Fchk   .= (Tii .- η_ve.*λ) .- τ_y .- Pt.*sinϕ .- λ.*η_reg
+                    Txx    .= Txx .- η_ve.*λ.*Txx./Tii
+                    Tyy    .= Tyy .- η_ve.*λ.*Tyy./Tii
+                    Txy    .= Txy .- η_ve.*λ.*Txy./Tii # Here we need the component for centroid update
+                    Tii    .= Tii .- η_ve.*λ
+                    η_vep  .= Tii./2.0./Eii
+    
+                elseif pl_correction == :native_inv3
+                    # Invariants
+                    Eii    .= sqrt.(0.5*(Exx1.^2 .+ Eyy1.^2) .+ av(Exyv1.^2))
+                    Tii    .= 2.0.*η_ve.*Eii
+    
+                    # yield function
+                    F      .= Tii .- τ_y .- Pt.*sinϕ
+                    Pla    .= 0.0
+                    Pla    .= F .> 0.0
+                    λ      .= Pla.*F./(η_ve .+ η_reg)
+                    Tii    .= Tii .- η_ve.*λ        # correct invariant
+                    Fchk   .= Tii .- τ_y .- Pt.*sinϕ .- λ.*η_reg
+    
+                    η_vep  .= Tii./2.0./Eii
+                    Txx    .= 2*η_vep.*Exx1         
+                    Tyy    .= 2*η_vep.*Eyy1
+                    Txy    .= 2*η_vep.*Exy1
+                end
             end
             Txyv[2:end-1,2:end-1].=av(Txy)      # Txyv=0 on boundaries !
             # PT timestep
@@ -260,9 +277,8 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
         display(plot(p1, p2, p3, p4))
     end
-    return
+    return evo_t, evo_Txx
 end
 
-
-# Stokes2D_vep(true)
-Stokes2D_vep(false)
+@time evo_t, evo_Txx = Stokes2D_vep(false, 10) # 2nd argument = timesteps  7.311026 seconds (2.91 M allocations: 16.403 GiB, 16.54% gc time)
+@time evo_t, evo_Txx_GP = Stokes2D_vep(true, 10) # 2nd argument = timesteps  9.368483 seconds (2.73 M allocations: 13.804 GiB, 8.24% gc time)
