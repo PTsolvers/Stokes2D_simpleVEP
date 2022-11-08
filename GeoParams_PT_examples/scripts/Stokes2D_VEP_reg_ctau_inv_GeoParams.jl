@@ -24,13 +24,28 @@ function update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, 
     @inbounds for j in axes(Exx,2), i in axes(Exx,1)
         args = (; dt=dt, P=Pt[i,j], τII_old=0.0)
         # gather strain rate
-        εij_v = (Exyv[i,j], Exyv[i+1,j], Exyv[i+1,j], Exyv[i,j+1]) # gather vertices around ij center
+        εij_v = (
+            Exyv[i  ,j  ], 
+            Exyv[i+1,j  ], 
+            Exyv[i  ,j+1], 
+            Exyv[i+1,j+1]
+        ) # gather vertices around ij center
         εij_p = (Exx[i,j], Eyy[i,j], εij_v)
         # gather deviatoric stress
-        τij_v = (Txyv_o[i,j], Txyv_o[i+1,j], Txyv_o[i+1,j], Txyv_o[i,j+1]) # gather vertices around ij center
+        τij_v = (
+            Txyv_o[i  ,j  ], 
+            Txyv_o[i+1,j  ], 
+            Txyv_o[i  ,j+1], 
+            Txyv_o[i+1,j+1]
+        ) # gather vertices around ij center
         τij_p_o = (Txx_o[i,j], Tyy_o[i,j], τij_v)
         # gathermaterial phases
-        phases_v = (Phasev[i,j], Phasev[i+1,j], Phasev[i+1,j], Phasev[i,j+1]) # gather vertices around ij center
+        phases_v = (
+            Phasev[i  ,j  ], 
+            Phasev[i+1,j  ], 
+            Phasev[i  ,j+1], 
+            Phasev[i+1,j+1]
+        ) # gather vertices around ij center
         phases = (Phasec[i,j], Phasec[i,j], phases_v)
         # update stress and effective viscosity
         Tij, Tii[i,j], η_vep[i,j] = compute_τij(MatParam, εij_p, args, τij_p_o, phases)
@@ -164,7 +179,7 @@ end
             Exyv[2:end-1,2:end-1] .= 0.5.*(diff(Vx[2:end-1,:], dims=2)./dy .+ diff(Vy[:,2:end-1], dims=1)./dx)
             Exy    .= av(Exyv)
             if UseGeoParams
-                @timeit to "GP update" update_stress_GP!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txy_o, Exx, Eyy, Exy, η_vep, Pt, Phasec, MatParam, dt)
+                # @timeit to "GP update" update_stress_GP!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txy_o, Exx, Eyy, Exy, η_vep, Pt, Phasec, MatParam, dt)
                 @timeit to "GP update" update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, Exyv, η_vep, Pt, Phasec, Phasev, MatParam, dt)
                 # @inbounds for j in axes(Exx,2), i in axes(Exx,1)
                 #     # compute second invariants from surrounding points
@@ -315,18 +330,5 @@ end
     return evo_t, evo_Txx, to
 end
 
-@time evo_t, evo_Txx, to = Stokes2D_vep(false, 5) # 2nd argument = timesteps  7.311026 seconds (2.91 M allocations: 16.403 GiB, 16.54% gc time)
+# @time evo_t, evo_Txx, to = Stokes2D_vep(false, 5) # 2nd argument = timesteps  7.311026 seconds (2.91 M allocations: 16.403 GiB, 16.54% gc time)
 @time evo_t, evo_Txx_GP, to_GP = Stokes2D_vep(true, 5) # 2nd argument = timesteps  9.368483 seconds (2.73 M allocations: 13.804 GiB, 8.24% gc time)
-
-
-foo(a,b,c) = a + b/2.0./c
-
-a = rand(4)
-b = rand(4)
-c = rand(4)
-
-av(x)=sum(x)/length(x)
-
-sum(foo.(a,b,c))/4
-foo(av(a),av(b),av(c))
-
