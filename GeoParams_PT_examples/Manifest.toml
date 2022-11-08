@@ -177,6 +177,11 @@ git-tree-sha1 = "bad72f730e9e91c08d9427d5e8db95478a3c323d"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.4.8+0"
 
+[[deps.ExprTools]]
+git-tree-sha1 = "56559bbef6ca5ea0c0818fa5c90320398a6fbf8d"
+uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
+version = "0.1.8"
+
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]
 git-tree-sha1 = "b57e3acbe22f8484b4b5ff66a7499717fe1a9cc8"
@@ -249,8 +254,8 @@ version = "0.69.1+0"
 
 [[deps.GeoParams]]
 deps = ["BibTeX", "DelimitedFiles", "ForwardDiff", "Interpolations", "KernelDensitySJ", "LaTeXStrings", "Loess", "Parameters", "Requires", "Roots", "Setfield", "SpecialFunctions", "Static", "StaticArrays", "Statistics", "StatsBase", "UnPack", "Unidecode", "Unitful"]
-git-tree-sha1 = "406f395a4e093ac5b79dd8da37d7854de1fa9fa8"
-repo-rev = "adm-cuda-check"
+git-tree-sha1 = "03f4e085458c87c6db289461c0901679e6ffdb10"
+repo-rev = "adm-tuples"
 repo-url = "https://github.com/JuliaGeodynamics/GeoParams.jl.git"
 uuid = "e018b62d-d9de-4a26-8697-af89c310ae38"
 version = "0.4.1"
@@ -788,6 +793,12 @@ version = "0.1.1"
 [[deps.Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[[deps.TimerOutputs]]
+deps = ["ExprTools", "Printf"]
+git-tree-sha1 = "9dfcb767e17b0849d6aaf85997c98a5aea292513"
+uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+version = "0.5.21"
 
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]
