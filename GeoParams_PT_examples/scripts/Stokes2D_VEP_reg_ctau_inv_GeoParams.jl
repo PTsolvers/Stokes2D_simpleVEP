@@ -58,9 +58,9 @@ end
 # 2D Stokes routine
 @views function Stokes2D_vep(UseGeoParams, nt)
     pl_correction = :native_naive
-    # pl_correction = :native_inv1
-    # pl_correction = :native_inv2
-    # pl_correction = :native_inv3
+    pl_correction = :native_inv1
+    pl_correction = :native_inv2
+    pl_correction = :native_inv3
     
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     η_reg   = 8.0e-3             # regularisation "viscosity"
@@ -181,17 +181,6 @@ end
             if UseGeoParams
                 # @timeit to "GP update" update_stress_GP!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txy_o, Exx, Eyy, Exy, η_vep, Pt, Phasec, MatParam, dt)
                 @timeit to "GP update" update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, Exyv, η_vep, Pt, Phasec, Phasev, MatParam, dt)
-                # @inbounds for j in axes(Exx,2), i in axes(Exx,1)
-                #     # compute second invariants from surrounding points
-                #     args = (; dt=dt, P=Pt[i,j])             
-                #     εij = (Exx[i,j], Eyy[i,j], Exy[i,j])
-                #     τij_o = (Txx_o[i,j], Tyy_o[i,j], Txy_o[i,j])
-                #     Tij, Tii[i,j], η_vep[i,j] = compute_τij(MatParam, εij, args, τij_o, Phasec[i,j])
-                #     Txx[i,j] = Tij[1]
-                #     Tyy[i,j] = Tij[2]
-                #     Txy[i,j] = Tij[3]
-                #     # η_vep[i,j] = Txx[i,j]/2/Exx1[i,j]  # should be same as native?
-                # end
             else
                 @timeit to "non GP update" begin
                     # visco-elastic strain rates
@@ -309,26 +298,28 @@ end
             if mod(iter, nout)==0
                 norm_Rx = norm(Rx)/length(Rx); norm_Ry = norm(Ry)/length(Ry); norm_∇V = norm(∇V)/length(∇V)
                 err = maximum([norm_Rx, norm_Ry, norm_∇V])
-                push!(err_evo1, err); push!(err_evo2, itg)
-                @printf("it = %d, iter = %d, err = %1.2e norm[Rx=%1.2e, Ry=%1.2e, ∇V=%1.2e] (Fchk=%1.2e) \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V, maximum(Fchk))
+                # push!(err_evo1, err); push!(err_evo2, itg)
+                # @printf("it = %d, iter = %d, err = %1.2e norm[Rx=%1.2e, Ry=%1.2e, ∇V=%1.2e] (Fchk=%1.2e) \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V, maximum(Fchk))
             end
             iter+=1; itg=iter
         end
         t = t + dt
         push!(evo_t, t); push!(evo_Txx, maximum(Txx))
-        # Plotting
-        p1 = heatmap(xv, yc, Vx' , aspect_ratio=1, xlims=(0, Lx), ylims=(dy/2, Ly-dy/2), c=:inferno, title="Vx")
-        # p2 = heatmap(xc, yv, Vy' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="Vy")
-        p2 = heatmap(xc, yc, η_vep' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="η_vep")
-        p3 = heatmap(xc, yc, Tii' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="τii")
-        p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
-            plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution for VE loading
-            plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0)            # viscous flow stress
-            if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
-        display(plot(p1, p2, p3, p4))
+        # # Plotting
+        # p1 = heatmap(xv, yc, Vx' , aspect_ratio=1, xlims=(0, Lx), ylims=(dy/2, Ly-dy/2), c=:inferno, title="Vx")
+        # # p2 = heatmap(xc, yv, Vy' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="Vy")
+        # p2 = heatmap(xc, yc, η_vep' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="η_vep")
+        # p3 = heatmap(xc, yc, Tii' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="τii")
+        # p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
+        #     plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution for VE loading
+        #     plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0)            # viscous flow stress
+        #     if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
+        # display(plot(p1, p2, p3, p4))
     end
     return evo_t, evo_Txx, to
 end
 
-# @time evo_t, evo_Txx, to = Stokes2D_vep(false, 5) # 2nd argument = timesteps  7.311026 seconds (2.91 M allocations: 16.403 GiB, 16.54% gc time)
-@time evo_t, evo_Txx_GP, to_GP = Stokes2D_vep(true, 5) # 2nd argument = timesteps  9.368483 seconds (2.73 M allocations: 13.804 GiB, 8.24% gc time)
+@time evo_t, evo_Txx, to = Stokes2D_vep(false, 12) # 2nd argument = timesteps  7.311026 seconds (2.91 M allocations: 16.403 GiB, 16.54% gc time)
+@time evo_t, evo_Txx_GP, to_GP = Stokes2D_vep(true, 12) # 2nd argument = timesteps  9.368483 seconds (2.73 M allocations: 13.804 GiB, 8.24% gc time)
+
+plot(evo_t, @.((evo_Txx-evo_Txx_GP)/evo_Txx*100), ylabel="error (%)", xlabel="time" )
