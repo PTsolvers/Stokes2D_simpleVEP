@@ -1,3 +1,4 @@
+# This script implements plasticity with and w/out invariants & shows how to use GeoParams to do the local stress update
 # Initialisation
 using Plots, Printf, Statistics, LinearAlgebra, GeoParams, TimerOutputs
 const Dat = Float64  # Precision (double=Float64 or single=Float32)
@@ -61,6 +62,10 @@ end
     pl_correction = :native_inv1
     pl_correction = :native_inv2
     pl_correction = :native_inv3
+
+    gp_correction = :loop
+    #gp_correction = :native_gp
+    
     
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     η_reg   = 8.0e-3             # regularisation "viscosity"
@@ -76,15 +81,16 @@ end
     εbg     = 1.0                # background strain-rate
     Coh     = τ_y/cosd(ϕ)        # cohesion
     # Coh     = Inf
+
     # Geoparams initialisation
-    pl = DruckerPrager_regularised(C=Coh, ϕ=ϕ, η_vp=η_reg)        # non-regularized plasticity
+    pl = DruckerPrager_regularised(C=Coh, ϕ=ϕ, η_vp=η_reg, Ψ=0)        # non-regularized plasticity
     MatParam = (SetMaterialParams(Name="Matrix"   , Phase=1,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=G0),LinearViscous(η=μ0),pl)), 
+                CompositeRheology = CompositeRheology(SetConstantElasticity(G=G0, ν=0.5),LinearViscous(η=μ0), pl)), 
                 SetMaterialParams(Name="Inclusion", Phase=2,
-                CompositeRheology = CompositeRheology(ConstantElasticity(G=Gi),LinearViscous(η=μ0),pl)),
+                CompositeRheology = CompositeRheology(SetConstantElasticity(G=Gi, ν=0.5),LinearViscous(η=μ0), pl)),
                 )
     # Numerics
-    # nt      = 10                 # number of time steps
+    # nt      = 10               # number of time steps
     nx, ny  = 63, 63             # numerical grid resolution
     Vdmp    = 4.0                # convergence acceleration (damping)
     Vsc     = 2.0                # iterative time step limiter
@@ -97,6 +103,7 @@ end
     dt      = μ0/G0/4.0 # assumes Maxwell time of 4
     # Array initialisation
     Pt      = zeros(Dat, nx  ,ny  )
+    P_o     = zeros(Dat, nx,  ny  )
     ∇V      = zeros(Dat, nx  ,ny  )
     Vx      = zeros(Dat, nx+1,ny  )
     Vy      = zeros(Dat, nx  ,ny+1)
@@ -167,7 +174,7 @@ end
     to = TimerOutput()
     for it = 1:nt
         iter=1; err=2*ε; err_evo1=Float64[]; err_evo2=Float64[]
-        Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv; λ.=0.0
+        Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv; λ.=0.0; P_o .= Pt
         local itg
         while (err>ε && iter<=iterMax)
             # divergence - pressure
@@ -179,8 +186,14 @@ end
             Exyv[2:end-1,2:end-1] .= 0.5.*(diff(Vx[2:end-1,:], dims=2)./dy .+ diff(Vy[:,2:end-1], dims=1)./dx)
             Exy    .= av(Exyv)
             if UseGeoParams
-                # @timeit to "GP update" update_stress_GP!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txy_o, Exx, Eyy, Exy, η_vep, Pt, Phasec, MatParam, dt)
-                @timeit to "GP update" update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, Exyv, η_vep, Pt, Phasec, Phasev, MatParam, dt)
+                # This uses the build-in GeoParams function to update stresses
+                @timeit to "GP update" begin
+                    if gp_correction  == :native_gp
+                        compute_τij_stagcenter!(Txx, Tyy, Txy, Tii, η_vep, Exx, Eyy, Exyv, Pt, Txx_o, Tyy_o, Txyv_o, Phasec, Phasev, MatParam, dt) 
+                    elseif gp_correction  == :loop
+                        update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, Exyv, η_vep, Pt, Phasec, Phasev, MatParam, dt)
+                    end
+                end
             else
                 @timeit to "non GP update" begin
                     # visco-elastic strain rates
@@ -281,7 +294,6 @@ end
                     end
                 end
             end
-
             Txyv[2:end-1,2:end-1].=av(Txy)      # Txyv=0 on boundaries !
             # PT timestep
             dtVx   .= min(dx,dy)^2.0./av_xa(η_vep)./4.1./Vsc
@@ -298,28 +310,30 @@ end
             if mod(iter, nout)==0
                 norm_Rx = norm(Rx)/length(Rx); norm_Ry = norm(Ry)/length(Ry); norm_∇V = norm(∇V)/length(∇V)
                 err = maximum([norm_Rx, norm_Ry, norm_∇V])
-                # push!(err_evo1, err); push!(err_evo2, itg)
-                # @printf("it = %d, iter = %d, err = %1.2e norm[Rx=%1.2e, Ry=%1.2e, ∇V=%1.2e] (Fchk=%1.2e) \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V, maximum(Fchk))
+                push!(err_evo1, err); push!(err_evo2, itg)
+                @printf("it = %d, iter = %d, err = %1.2e norm[Rx=%1.2e, Ry=%1.2e, ∇V=%1.2e] (Fchk=%1.2e) \n", it, itg, err, norm_Rx, norm_Ry, norm_∇V, maximum(Fchk))
             end
             iter+=1; itg=iter
         end
         t = t + dt
         push!(evo_t, t); push!(evo_Txx, maximum(Txx))
-        # # Plotting
-        # p1 = heatmap(xv, yc, Vx' , aspect_ratio=1, xlims=(0, Lx), ylims=(dy/2, Ly-dy/2), c=:inferno, title="Vx")
-        # # p2 = heatmap(xc, yv, Vy' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="Vy")
-        # p2 = heatmap(xc, yc, η_vep' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="η_vep")
-        # p3 = heatmap(xc, yc, Tii' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="τii")
-        # p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
-        #     plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution for VE loading
-        #     plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0)            # viscous flow stress
-        #     if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
-        # display(plot(p1, p2, p3, p4))
+        
+        # Plotting
+        p1 = heatmap(xv, yc, Vx' , aspect_ratio=1, xlims=(0, Lx), ylims=(dy/2, Ly-dy/2), c=:inferno, title="Vx")
+        # p2 = heatmap(xc, yv, Vy' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="Vy")
+         p2 = heatmap(xc, yc, η_vep' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="η_vep")
+         p3 = heatmap(xc, yc, Tii' , aspect_ratio=1, xlims=(dx/2, Lx-dx/2), ylims=(0, Ly), c=:inferno, title="τii")
+         p4 = plot(evo_t, evo_Txx , legend=false, xlabel="time", ylabel="max(τxx)", linewidth=0, markershape=:circle, framestyle=:box, markersize=3)
+         plot!(evo_t, 2.0.*εbg.*μ0.*(1.0.-exp.(.-evo_t.*G0./μ0)), linewidth=2.0) # analytical solution for VE loading
+         plot!(evo_t, 2.0.*εbg.*μ0.*ones(size(evo_t)), linewidth=2.0)            # viscous flow stress
+         if !do_DP plot!(evo_t, τ_y*ones(size(evo_t)), linewidth=2.0) end        # von Mises yield stress
+         display(plot(p1, p2, p3, p4))
+         
     end
     return evo_t, evo_Txx, to
 end
 
-@time evo_t, evo_Txx, to = Stokes2D_vep(false, 12) # 2nd argument = timesteps  7.311026 seconds (2.91 M allocations: 16.403 GiB, 16.54% gc time)
+#@time evo_t, evo_Txx, to = Stokes2D_vep(false, 12) # 2nd argument = timesteps  7.311026 seconds (2.91 M allocations: 16.403 GiB, 16.54% gc time)
 @time evo_t, evo_Txx_GP, to_GP = Stokes2D_vep(true, 12) # 2nd argument = timesteps  9.368483 seconds (2.73 M allocations: 13.804 GiB, 8.24% gc time)
 
-plot(evo_t, @.((evo_Txx-evo_Txx_GP)/evo_Txx*100), ylabel="error (%)", xlabel="time" )
+#plot(evo_t, @.((evo_Txx-evo_Txx_GP)/evo_Txx*100), ylabel="error (%)", xlabel="time" )
