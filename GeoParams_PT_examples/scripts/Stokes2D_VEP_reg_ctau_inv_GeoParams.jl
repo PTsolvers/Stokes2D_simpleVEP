@@ -63,8 +63,9 @@ end
     pl_correction = :native_inv2
     pl_correction = :native_inv3
 
-    gp_correction = :loop
-    #gp_correction = :native_gp
+    #gp_correction = :loop
+    gp_correction = :native_gp
+    #gp_correction = :native_gp_dilation
     
     
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
@@ -192,6 +193,8 @@ end
                         compute_τij_stagcenter!(Txx, Tyy, Txy, Tii, η_vep, Exx, Eyy, Exyv, Pt, Txx_o, Tyy_o, Txyv_o, Phasec, Phasev, MatParam, dt) 
                     elseif gp_correction  == :loop
                         update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, Exyv, η_vep, Pt, Phasec, Phasev, MatParam, dt)
+                    elseif gp_correction  == :native_gp_dilation
+                        compute_p_τij_stagcenter!(Txx, Tyy, Txy, Tii, η_vep, Pt, Exx, Eyy, Exyv, P_o, Txx_o, Tyy_o, Txyv_o, Phasec, Phasev, MatParam, dt) 
                     end
                 end
             else
