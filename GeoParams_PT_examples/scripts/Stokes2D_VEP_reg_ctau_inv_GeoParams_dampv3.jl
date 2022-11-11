@@ -1,6 +1,6 @@
-using ElasticArrays,Printf
+using ElasticArrays, Printf, GeoParams
 using Plots,Plots.Measures
-default(size=(800,500),framestyle=:box,label=false,grid=false,margin=3mm,lw=6,labelfontsize=11,tickfontsize=11,titlefontsize=11)
+default(size=(800,500),framestyle=:box,label=false,grid=false,lw=6,labelfontsize=11,tickfontsize=11,titlefontsize=11)
 
 @inline amean(a,b) = 0.5*(a + b)
 @inline hmean(a,b) = 2.0/(1.0/a + 1.0/b)
@@ -79,6 +79,50 @@ end
 #     return
 # end
 
+function update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, Exyv, η, η_vep, Pt, Phasec, Phasev, MatParam, dt, G, lτ, r, re_mech, vdτ)
+    θ_dτ    = lτ*(r+2.0)/(re_mech*vdτ)
+    @inbounds for j in axes(Exx,2), i in axes(Exx,1)
+        dτ_r = 1.0/(θ_dτ + 1/η_vep[i,j]) # equivalent to dτ_r = @. 1.0/(θ_dτ + η/(G*dt) + 1.0)
+        args = (; dt=dt, P=Pt[i,j], τII_old=0.0)
+        # # gather strain rate
+        εij_v = (
+            Exyv[i  ,j  ], 
+            Exyv[i+1,j  ], 
+            Exyv[i  ,j+1], 
+            Exyv[i+1,j+1]
+        ) # gather vertices around ij center
+        
+        εij_p = (Exx[i,j], Eyy[i,j], εij_v)
+        # gather deviatoric stress
+        τij_v = (
+            Txyv_o[i  ,j  ], 
+            Txyv_o[i+1,j  ], 
+            Txyv_o[i  ,j+1], 
+            Txyv_o[i+1,j+1]
+        ) # gather vertices around ij center
+        τij_p_o = (Txx_o[i,j], Tyy_o[i,j], τij_v)
+        # gathermaterial phases
+        phases_v = (
+            Phasev[i  ,j  ], 
+            Phasev[i+1,j  ], 
+            Phasev[i  ,j+1], 
+            Phasev[i+1,j+1]
+        ) # gather vertices around ij center
+        phases = (Phasec[i,j], Phasec[i,j], phases_v)
+        # update stress and effective viscosity
+        Tij, Tii[i,j], η_vep[i,j] = compute_τij(MatParam, εij_p, args, τij_p_o, phases)
+         
+        # need to compute τij/η_ve(p?) in
+        # Txx[i,j] += dτ_r * (-(Txx[i,j])/(G[i,j]*dt) - Txx[i,j]/η[i,j] + 2*ε_eff[1])
+        # Tyy[i,j] += dτ_r * (-(Tyy[i,j])/(G[i,j]*dt) - Tyy[i,j]/η[i,j] + 2*ε_eff[2])
+        # Txy[i,j] += dτ_r * (-(Txy[i,j])/(G[i,j]*dt) - Txy[i,j]/η[i,j] + 2*ε_eff[3])
+
+        Txx[i,j] += dτ_r * (-(Txx[i,j]) + Tij[1] ) / η_vep[i,j] # NOTE: from GP Tij = 2*η_vep * εij
+        Tyy[i,j] += dτ_r * (-(Tyy[i,j]) + Tij[2] ) / η_vep[i,j] 
+        Txy[i,j] += dτ_r * (-(Txy[i,j]) + Tij[3] ) / η_vep[i,j] 
+
+    end
+end
 
 @views function update_stresses!(Pr,Pr_old,dPr,K,Txx,Tyy,Txy,Txx_o,Tyy_o,Txy_o,TII,Exx,Eyy,Exy,Exyv,Exx_ve,Eyy_ve,Exy_ve,EII_ve,η_vep,Vx,Vy,∇V,η,G,dτ_r,dt,re_mech,vdτ,lτ,r,dx,dy)
     θ_dτ    = lτ*(r+2.0)/(re_mech*vdτ)
@@ -98,11 +142,26 @@ end
     Exy_ve .= Exy .+ 0.5.*Txy_o./(G.*dt)
     EII_ve .= sqrt.(0.5.*(Exx_ve.^2 .+ Eyy_ve.^2) .+ Exy_ve.^2)
     # stress increments
-    Txx   .+= (.-(Txx .- Txx_o).*η./(G.*dt) .- Txx .+ 2.0.*η.*Exx).*dτ_r
-    Tyy   .+= (.-(Tyy .- Tyy_o).*η./(G.*dt) .- Tyy .+ 2.0.*η.*Eyy).*dτ_r
-    Txy   .+= (.-(Txy .- Txy_o).*η./(G.*dt) .- Txy .+ 2.0.*η.*Exy).*dτ_r
-    TII    .= sqrt.(0.5.*((Txx).^2 .+ (Tyy).^2) .+ (Txy).^2)
-    η_vep  .= TII ./ 2.0 ./ EII_ve
+    Txx   .+= (.-(Txx .- Txx_o)./(G.*dt) .- Txx./η .+ 2.0.*Exx).*dτ_r
+    Tyy   .+= (.-(Tyy .- Tyy_o)./(G.*dt) .- Tyy./η .+ 2.0.*Eyy).*dτ_r
+    Txy   .+= (.-(Txy .- Txy_o)./(G.*dt) .- Txy./η .+ 2.0.*Exy).*dτ_r
+    TII   .= sqrt.(0.5.*((Txx).^2 .+ (Tyy).^2) .+ (Txy).^2)
+    η_vep .= TII ./ 2.0 ./ EII_ve
+    return
+end
+
+@views function update_P_strain!(Pr,Pr_old,dPr,K,Exx,Eyy,Exy,Exyv,Vx,Vy,∇V,η,G,dτ_r,dt,re_mech,vdτ,lτ,r,dx,dy)
+    θ_dτ    = lτ*(r+2.0)/(re_mech*vdτ)
+    dτ_r   .= 1.0./(θ_dτ .+ η./(G.*dt) .+ 1.0)
+    ∇V     .= diff(Vx,dims=1)./dx .+ diff(Vy,dims=2)./dy
+    # dPr    .= .-∇V
+    dPr    .= .-∇V .- (Pr .- Pr_old)./K./dt
+    # Pr    .+= (r/θ_dτ).*η.*dPr
+    Pr    .+= dPr./(1.0./(r/θ_dτ.*η) .+ 1.0./K./dt)
+    Exx    .= diff(Vx,dims=1)./dx .- ∇V./3.0
+    Eyy    .= diff(Vy,dims=2)./dy .- ∇V./3.0
+    Exyv[2:end-1,2:end-1] .= 0.5*(diff(Vx[2:end-1,:],dims=2)./dy .+ diff(Vy[:,2:end-1],dims=1)./dx)
+    Exy    .= ameanxy(Exyv)
     return
 end
 
@@ -119,25 +178,8 @@ end
     return
 end
 
-@views function compte_η_G_ρg!((;K,η,G,ρgy_c,phase,ηb),K0,η0,G0,ρg0,xc,yc,x0,y0c,y0d,r_cav,r_dep,δ_sd)
-    Threads.@threads for iy in axes(η,2)
-        for ix in axes(η,1)
-            sd_air = min(sqrt((xc[ix]-x0)^2 + 2*(yc[iy]-y0c)^2)-r_cav,
-                         sqrt((xc[ix]-x0)^2 + 5*(yc[iy]-y0d)^2)-r_dep)
-            t_air  = 0.5*(tanh(-sd_air/δ_sd) + 1)
-            t_ice  = 1.0 - t_air
-            η[ix,iy]     = t_ice*η0.ice  + t_air*η0.air
-            G[ix,iy]     = t_ice*G0.ice  + t_air*G0.air
-            K[ix,iy]     = t_ice*K0.ice  + t_air*K0.air
-            ρgy_c[ix,iy] = t_ice*ρg0.ice + t_air*ρg0.air
-            phase[ix,iy] = 1.0 - t_air
-            ηb[ix,iy]    = (1.0 - t_air)*1e12 + t_air*1.0
-        end
-    end
-    return
-end
 
-function main()
+function main(UseGP)
     pl_correction = :native_naive
     pl_correction = :native_inv1
     pl_correction = :native_inv2
@@ -146,7 +188,6 @@ function main()
     #gp_correction = :loop
     gp_correction = :native_gp
     # gp_correction = :native_gp_dilation
-    
     
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     η_reg   = 8.0e-3             # regularisation "viscosity"
@@ -161,7 +202,7 @@ function main()
     Gi      = G0/(6.0-4.0*do_DP) # elastic shear modulus perturbation
     εbg     = 1.0                # background strain-rate
     Coh     = τ_y/cosd(ϕ)        # cohesion
-    # Coh     = Inf
+    Coh     = Inf
 
     # Geoparams initialisation
     pl = DruckerPrager_regularised(C=Coh, ϕ=ϕ, η_vp=η_reg, Ψ=0)        # non-regularized plasticity
@@ -260,7 +301,7 @@ function main()
     η_ev[radv.<radi]   .= dt*Gi
     Phasec[radc.<radi] .= 2
     Phasev[radv.<radi] .= 2
-    η_ve    .= (1.0./η_e + 1.0./η_v).^-1
+    η_vep    .= (1.0./η_e + 1.0./η_v).^-1
     η_vev   .= (1.0./η_ev + 1.0./η_vv).^-1
     Vx      .=   εbg.*Xvx
     Vy      .= .-εbg.*Yvy
@@ -284,7 +325,7 @@ function main()
     # ispath("anim")&&rm("anim",recursive=true);mkdir("anim");iframe = -1
     # time loop
     nt = 15
-    maxiter = 20e3
+    maxiter = 10e3
     ncheck = 100
     for it = 1:nt
         @printf("it=%d\n",it)
@@ -293,8 +334,13 @@ function main()
         resize!(iter_evo,0); resize!(errs_evo,length(ϵtol),0)
         while any(errs .>= ϵtol) && iter <= maxiter
             update_iteration_params!(η,ητ)
-            # update_stresses!(fields,τ_y,sinϕ,sinψ,η_reg,relλ,dt,re_mech,vdτ,lτ,r,dx,dy,iter)
-            update_stresses!(Pt,Pt_old,dPt,Kb,Txx,Tyy,Txy,Txx_o,Tyy_o,Txy_o,TII,Exx,Eyy,Exy,Exyv,Exx_ve,Eyy_ve,Exy_ve,EII_ve,η_vep,Vx,Vy,∇V,η,G,dτ_r,dt,re_mech,vdτ,lτ,r,dx,dy)
+
+            if UseGP
+                update_P_strain!(Pt,Pt_old,dPt,Kb,Exx,Eyy,Exy,Exyv,Vx,Vy,∇V,η,G,dτ_r,dt,re_mech,vdτ,lτ,r,dx,dy)
+                update_stress_GP2!(Txx, Tyy, Txy, TII, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, Exyv, η, η_vep, Pt, Phasec, Phasev, MatParam, dt,G, lτ, r, re_mech, vdτ)
+            else
+                update_stresses!(Pt,Pt_old,dPt,Kb,Txx,Tyy,Txy,Txx_o,Tyy_o,Txy_o,TII,Exx,Eyy,Exy,Exyv,Exx_ve,Eyy_ve,Exy_ve,EII_ve,η_vep,Vx,Vy,∇V,η,G,dτ_r,dt,re_mech,vdτ,lτ,r,dx,dy)
+            end                   
             update_velocities!(Vx,Vy,Pt,Txx,Tyy,Txyv,ητ,ρgx,ρgy,vdτ,lτ,re_mech,dx,dy)
             
             # update_velocities!(fields,vdτ,lτ,re_mech,dx,dy)
@@ -329,8 +375,15 @@ function main()
         # p2=heatmap(xc,yc, Tii',title="η_vep")
         # display(p2)
     end
-    return evo_t, evo_τxx
+    return evo_t, evo_τxx, iter_evo
 end
 
-evo_t, evo_τxx = main()
-plot(evo_t, evo_τxx)
+@time evo_t, evo_τxx_GP, iter_evo_GP = main(true)
+@time evo_t, evo_τxx, iter_evo = main(false)
+
+# sol = @. 2.0*1*1*(1.0-exp(-evo_t*1/1))
+# plot(evo_t, evo_τxx, color=:black)
+# plot!(evo_t, evo_τxx_GP, color=:red)
+# scatter!(evo_t, sol)
+
+plot(evo_t, @.((evo_τxx-evo_τxx_GP)/evo_τxx*100), color=:black)
