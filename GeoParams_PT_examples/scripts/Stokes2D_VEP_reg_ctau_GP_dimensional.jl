@@ -14,8 +14,8 @@ const Dat = Float64  # Precision (double=Float64 or single=Float32)
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
     η_reg   = 1.5e20Pas            # regularisation "viscosity"
     # Physics
-    Lx, Ly  = 100km,100km        # domain size
-    radi    = 1km               # inclusion radius
+    Lx, Ly  = 100km,50km         # domain size
+    radi    = 1km                # inclusion radius
     τ_y     = 35MPa              # yield stress. If do_DP=true, τ_y stand for the cohesion: c*cos(ϕ)
     ϕ       = 30.0*do_DP
     μ0      = 1e23Pas            # viscous viscosity

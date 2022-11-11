@@ -56,6 +56,14 @@ function update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, 
     end
 end
 
+# Update sum of volumetric strainrate @ every point
+function update_Evol!(Evol, Pt, P_o, Phasec, MatParam, dt)
+    @inbounds for j in axes(Evol,2), i in axes(Evol,1)
+        args = (; dt=dt, τII_old=0.0, P_old=P_o[i,j])
+        Evol[i,j] = GeoParams.nphase(vi -> compute_εvol(vi.CompositeRheology[1], Pt[i,j], args), Phasec[i,j], MatParam)
+    end
+end
+
 # 2D Stokes routine
 @views function Stokes2D_vep(UseGeoParams, nt)
     pl_correction = :native_naive
@@ -64,8 +72,8 @@ end
     pl_correction = :native_inv3
 
     #gp_correction = :loop
-    gp_correction = :native_gp
-    #gp_correction = :native_gp_dilation
+    #gp_correction = :native_gp
+    gp_correction = :native_gp_dilation
     
     
     do_DP   = true               # do_DP=false: Von Mises, do_DP=true: Drucker-Prager (friction angle)
@@ -110,6 +118,7 @@ end
     Vy      = zeros(Dat, nx  ,ny+1)
     Exx     = zeros(Dat, nx  ,ny  )
     Eyy     = zeros(Dat, nx  ,ny  )
+    Evol    = zeros(Dat, nx  ,ny  )
     Exy     = zeros(Dat, nx  ,ny  )
     Exyv    = zeros(Dat, nx+1,ny+1)
     Exx1    = zeros(Dat, nx  ,ny  )
@@ -175,12 +184,12 @@ end
     to = TimerOutput()
     for it = 1:nt
         iter=1; err=2*ε; err_evo1=Float64[]; err_evo2=Float64[]
-        Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv; λ.=0.0; P_o .= Pt
+        Txx_o.=Txx; Tyy_o.=Tyy; Txy_o.=av(Txyv); Txyv_o.=Txyv; λ.=0.0; P_o .= Pt; Evol .= 0.0
         local itg
         while (err>ε && iter<=iterMax)
             # divergence - pressure
             ∇V     .= diff(Vx, dims=1)./dx .+ diff(Vy, dims=2)./dy
-            Pt     .= Pt .- dtPt.*∇V
+            Pt     .= Pt .- dtPt.*(∇V .- Evol)
             # strain rates
             Exx    .= diff(Vx, dims=1)./dx .- 1.0/3.0*∇V
             Eyy    .= diff(Vy, dims=2)./dy .- 1.0/3.0*∇V
@@ -195,6 +204,9 @@ end
                         update_stress_GP2!(Txx, Tyy, Txy, Tii, Txx_o, Tyy_o, Txyv_o, Exx, Eyy, Exyv, η_vep, Pt, Phasec, Phasev, MatParam, dt)
                     elseif gp_correction  == :native_gp_dilation
                         compute_p_τij_stagcenter!(Txx, Tyy, Txy, Tii, η_vep, Pt, Exx, Eyy, Exyv, P_o, Txx_o, Tyy_o, Txyv_o, Phasec, Phasev, MatParam, dt) 
+
+                        update_Evol!(Evol, Pt, P_o, Phasec, MatParam, dt)       # compute volumetrix strainrates @ every cell
+                        @show maximum(Evol)
                     end
                 end
             else
@@ -337,6 +349,6 @@ end
 end
 
 #@time evo_t, evo_Txx, to = Stokes2D_vep(false, 12) # 2nd argument = timesteps  7.311026 seconds (2.91 M allocations: 16.403 GiB, 16.54% gc time)
-@time evo_t, evo_Txx_GP, to_GP = Stokes2D_vep(true, 12) # 2nd argument = timesteps  9.368483 seconds (2.73 M allocations: 13.804 GiB, 8.24% gc time)
+@time evo_t, evo_Txx_GP, to_GP = Stokes2D_vep(true, 2) # 2nd argument = timesteps  9.368483 seconds (2.73 M allocations: 13.804 GiB, 8.24% gc time)
 
 #plot(evo_t, @.((evo_Txx-evo_Txx_GP)/evo_Txx*100), ylabel="error (%)", xlabel="time" )

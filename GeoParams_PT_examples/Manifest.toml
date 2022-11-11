@@ -2,7 +2,7 @@
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "3acd3157c619d661bbd583bb97bd1c274825a665"
+project_hash = "cb9741e83719ef7e84184b6d1f7936282dd3e190"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra"]
@@ -175,6 +175,12 @@ deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 version = "1.6.0"
 
+[[deps.ElasticArrays]]
+deps = ["Adapt"]
+git-tree-sha1 = "d1933fd3e53e01e2d0ae98b8f7f65784e2d5430b"
+uuid = "fdbdab4c-e67f-52f5-8c3f-e7b388dad3d4"
+version = "1.2.10"
+
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "bad72f730e9e91c08d9427d5e8db95478a3c323d"
@@ -261,7 +267,7 @@ version = "0.69.1+0"
 
 [[deps.GeoParams]]
 deps = ["BibTeX", "DelimitedFiles", "ForwardDiff", "Interpolations", "KernelDensitySJ", "LaTeXStrings", "Loess", "Parameters", "Requires", "Roots", "Setfield", "SpecialFunctions", "Static", "StaticArrays", "Statistics", "StatsBase", "UnPack", "Unidecode", "Unitful"]
-git-tree-sha1 = "52b20f3408c80ad6d351b4c4e82ee09d83192e5a"
+git-tree-sha1 = "e84aa62d2813f28e5241bbe88b327a266cc889f0"
 repo-rev = "adm-tuples"
 repo-url = "https://github.com/JuliaGeodynamics/GeoParams.jl.git"
 uuid = "e018b62d-d9de-4a26-8697-af89c310ae38"
