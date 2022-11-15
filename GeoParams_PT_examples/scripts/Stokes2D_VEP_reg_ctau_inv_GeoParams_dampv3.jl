@@ -618,3 +618,19 @@ end
 
 @time evo_t, evo_τxx, iter_evo, TII, η_vep = main(false, 25);
 @time evo_t, evo_τxx_GP, iter_evo_GP, TII, η_vep = main(true, 25);
+
+
+sol = @. 2.0 * 1 * 1 * (1.0 - exp(-evo_t * 1 / 1))
+scatter(evo_t, sol)
+plot!(evo_t, evo_τxx; color=:black, label="native v3", legend=:topleft)
+plot!(evo_t, evo_τxx_GP; color=:orange, label="GP v3")
+
+# plot!(evo_t, evo_Txx_v2; linestyle=:dash, color=:black, label="native v2")
+# plot!(evo_t, evo_Txx_GP_v2; linestyle=:dash, color=:orange, label="GP v2")
+
+# plot(evo_t, zeros(size(evo_t)), color=:gray, linestyle=:dash, xlabel="time", ylabel="error (%)", legend=:bottomright )
+# plot!(evo_t, @.((evo_τxx-sol)/sol*100),  label="native v3", xlabel="time", ylabel="error (%)" )
+# plot!(evo_t, @.((evo_τxx_GP-sol)/sol*100),  label="GP v3", xlabel="time", ylabel="error (%)" )
+
+# plot!(evo_t, @.((evo_Txx_v2-sol)/sol*100), linestyle=:dash, label="native v2", xlabel="time", ylabel="error (%)" )
+# plot!(evo_t, @.((evo_Txx_GP_v2-sol)/sol*100), linestyle=:dash,  label="GP v2", xlabel="time", ylabel="error (%)" )
