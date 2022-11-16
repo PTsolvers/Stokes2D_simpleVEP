@@ -38,18 +38,18 @@ end
 
 function bc2!(ητ)
     nx, ny = size(ητ)  
-    @parallel (1:nx) bc2_x!(ητ)
-    @parallel (1:ny) bc2_y!(ητ)
+    @parallel (1:ny) bc2_x!(ητ)
+    @parallel (1:nx) bc2_y!(ητ)
 end
 
-@parallel_indices (j) function bc2_y!(A)
+@parallel_indices (j) function bc2_x!(A)
     nx = size(A, 1)  
     A[1 , j] = A[2   , j]
     A[nx, j] = A[nx-1, j]
     return nothing
 end
 
-@parallel_indices (i) function bc2_x!(A)
+@parallel_indices (i) function bc2_y!(A)
     ny = size(A, 2)  
     A[i, 1] = A[i, 2   ]
     A[i, ny] = A[i, ny-1]
@@ -275,8 +275,9 @@ function main(nt)
         display(plot(p1,p2,p3,p4,layout=(2,2)))
         # png(plot(p1,p2,p3,p4,layout=(2,2)),@sprintf("anim/%04d.png",iframe+=1))
     end
+    
     return 
 end
 
 nt = 12 # number of time steps
-@time  main(nt);
+@time main(nt);
