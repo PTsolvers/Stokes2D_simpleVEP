@@ -2,7 +2,7 @@ using ElasticArrays, Printf, GeoParams
 using Plots, Plots.Measures
 using ParallelStencil
 using ParallelStencil.FiniteDifferences2D
-@init_parallel_stencil(CUDA, Float64, 2)
+@init_parallel_stencil(Threads, Float64, 2)
 
 plot_opts() = (aspect_ratio = 1, xlims = (0.007936507936507936, 0.9920634920634921), ylims = (0.007936507936507936, 0.9920634920634921), c = cgrad(:roma, rev=true), framestyle = :box)
 
@@ -56,14 +56,15 @@ end
     return nothing
 end
 
-@parallel_indices (i, j) function update_stress_GP_ps!(τxx, τyy, τxy, TII, τxx_o, Tyy_o, τxyv_o, εxx, εyy, εxyv, η_vep, Pt, Phasec, Phasev, MatParam, dt, lτ, r, re_mech, vdτ)
+@parallel_indices (i, j) function update_stress_GP_ps!(τxx, τyy, τxy, TII, τxx_o, Tyy_o, τxyv_o, εxx, εyy, εxyv, G, η, η_vep, Pt, Phasec, Phasev, MatParam, dt, lτ, r, re_mech, vdτ)
 
     # convinience closure (note here that i, j are captured because the closure is defined inside the loop when @parallel_indices is expanded)
     @inbounds @inline gather(A) = A[i, j], A[i + 1, j], A[i, j + 1], A[i + 1, j + 1] 
 
     # numerics
     θ_dτ                = lτ * (r + 2.0) / (re_mech * vdτ)
-    dτ_r                = 1.0 / (θ_dτ + 1 / η_vep[i, j]) # equivalent to dτ_r = @. 1.0/(θ_dτ + η/(G*dt) + 1.0)
+    # dτ_r                = 1.0 / (θ_dτ + 1 / η_vep[i, j]) # equivalent to dτ_r = @. 1.0/(θ_dτ + η/(G*dt) + 1.0)
+    dτ_r                = 1.0 / (θ_dτ / η[i, j] + 1 / η_vep[i, j]) # equivalent to dτ_r = @. 1.0/(θ_dτ + η/(G*dt) + 1.0)
     # Setup up input for GeoParams.jl
     args                = (; dt=dt, P=Pt[i, j], τII_old=0.0)
     εij_p               = (εxx[i, j], εyy[i, j], gather(εxyv))
@@ -127,11 +128,23 @@ end
     return nothing
 end
 
-@parallel function compute_residuals!(Rx, Ry, P, τxx, τyy, τxy, ρgx, ρgy, dx, dy)
-    @all(Rx) = @d_xa(τxx) / dx + @d_yi(τxy) / dy - @d_xa(P) / dx + @inn_y(ρgx)
-    @all(Ry) = @d_ya(τyy) / dy + @d_xi(τxy) / dx - @d_ya(P) / dy + @inn_x(ρgy)
+@parallel_indices (i, j) function compute_residuals!(Rx, Ry, P, τxx, τyy, τxy, ρgx, ρgy, dx, dy)
+
+    # Again, indices i, j are captured by the closure
+    @inbounds @inline d_xa(A)  = (A[i+1, j+1] - A[i  , j+1]) / dx 
+    @inbounds @inline d_ya(A)  = (A[i+1, j+1] - A[i+1, j  ]) / dy
+    @inbounds @inline d_xi(A)  = (A[i+2, j+1] - A[i+1, j+1]) / dy
+    @inbounds @inline d_yi(A)  = (A[i+1, j+2] - A[i+1, j+1]) / dx 
+    
+    if i ≤ size(Rx, 1) && j ≤ size(Rx, 2)
+        Rx[i, j] = d_xa(τxx) + d_yi(τxy) - d_xa(P) - ρgx[i  , j+1]
+    end#
+    if i ≤ size(Ry, 1) && j ≤ size(Ry, 2)#
+        Ry[i, j] = d_ya(τyy) + d_xi(τxy) - d_ya(P) - ρgy[i+1, j  ]
+    end
     return nothing
 end
+
 
 function main(nt)
     # Physics
@@ -146,6 +159,7 @@ function main(nt)
     Gi = G0 / (6.0 - 4.0 * do_DP) # elastic shear modulus perturbation
     εbg = 1.0                     # background strain-rate
     Coh = τ_y / cosd(ϕ)           # cohesion; if we let Coh = Inf, we recover visco-elastic problem
+    # Coh =Inf         # cohesion; if we let Coh = Inf, we recover visco-elastic problem
     # Geoparams initialisation
     pl = DruckerPrager_regularised(; C=Coh, ϕ=ϕ, η_vp=η_reg, Ψ=0)        # non-regularized plasticity
     MatParam = (
@@ -165,7 +179,7 @@ function main(nt)
         ),
     )
     # Numerics
-    nx, ny  = 255, 255             # numerical grid resolution
+    nx, ny  = 63, 63             # numerical grid resolution
     re_mech = 3π
     lτ      = min(Lx, Ly)
     dx, dy  = Lx / nx, Ly / ny
@@ -216,6 +230,11 @@ function main(nt)
     radv                  = (xv .- Lx ./ 2) .^ 2 .+ (yv' .- Ly ./ 2) .^ 2
     Phasec[radc .< radi] .= 2
     Phasev[radv .< radi] .= 2
+    η_e                   = dt * G0 * @ones(nx, ny)
+    η_e[radc .< radi]    .= dt * Gi
+    η_vep                .= (1.0 ./ η_e + 1.0 ./ η) .^ -1
+    Gc                    = @fill(G0, nx, ny)
+    Gc[radc .< radi]     .= Gi
     Vx                   .=   εbg .* Xvx
     Vy                   .= .-εbg .* Yvy
     # Time loop
@@ -243,14 +262,14 @@ function main(nt)
             @parallel compute_P!(Pt, Pt_old, RP, ∇V, η, Kb, dt, r, θ_dτ)
             @parallel compute_strain_rate!(∇V, εxx, εyy, εxyv, Vx, Vy, dx, dy)
             @parallel vertex2center!(Exy, εxyv)
-            @parallel (1:nx, 1:ny) update_stress_GP_ps!(τxx, τyy, τxy, TII, τxx_o, Tyy_o, τxyv_o, εxx, εyy, εxyv, η_vep, Pt, Phasec, Phasev, MatParam, dt, lτ, r, re_mech, vdτ)
+            @parallel (1:nx, 1:ny) update_stress_GP_ps!(τxx, τyy, τxy, TII, τxx_o, Tyy_o, τxyv_o, εxx, εyy, εxyv, Gc, η, η_vep, Pt, Phasec, Phasev, MatParam, dt, lτ, r, re_mech, vdτ)
             @parallel center2vertex!(τxyv, τxy)
 
             @parallel (1:nx, 1:ny) update_velocities!(Vx, Vy, Pt, τxx, τyy, τxyv, ηdτ, ρgx, ρgy, ητ, dx, dy)
 
             if iter % ncheck == 0
                 # update residuals
-                @parallel compute_residuals!(Rx, Ry, Pt, τxx, τyy, τxyv, ρgx, ρgy, dx, dy)
+                @parallel (1:nx, 1:ny)  compute_residuals!(Rx, Ry, Pt, τxx, τyy, τxyv, ρgx, ρgy, dx, dy)
                 errs = maximum.((abs.(Rx), abs.(Ry), abs.(RP)))
                 # push!(iter_evo, iter / max(nx, ny))
                 append!(errs_evo, errs)
@@ -279,5 +298,5 @@ function main(nt)
     return 
 end
 
-nt = 12 # number of time steps
+nt = 15 # number of time steps
 @time main(nt);
