@@ -1,3 +1,4 @@
+# with plastic dilation
 # Initialisation
 using Plots, Printf, Statistics, LinearAlgebra
 Dat = Float64  # Precision (double=Float64 or single=Float32)
