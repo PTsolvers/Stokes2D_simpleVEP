@@ -26,7 +26,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Vdmp    = 4.0                # convergence acceleration (damping)
     Vsc     = 2.0                # iterative time step limiter
     Ptsc    = 4.0               # iterative time step limiter
-    rel     = 1e-1               # relaxation of plastic multiplier rate 
+    rel     = 0.1               # relaxation of plastic multiplier rate 
     ε       = 1e-6               # nonlinear tolerence
     iterMax = 3e4                # max number of iters
     nout    = 200                # check frequency
