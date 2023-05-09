@@ -23,9 +23,10 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     # Numerics
     nt      = 10                 # number of time steps
     nx, ny  = 63, 63             # numerical grid resolution
-    Vdmp    = 8.0                # convergence acceleration (damping)
-    Vsc     = 4.0                # iterative time step limiter
-    Ptsc    = 6.0                # iterative time step limiter
+    Vdmp    = 4.0                # convergence acceleration (damping)
+    Vsc     = 2.0                # iterative time step limiter
+    Ptsc    = 4.0               # iterative time step limiter
+    rel     = 1e-1               # relaxation of plastic multiplier rate 
     ε       = 1e-6               # nonlinear tolerence
     iterMax = 3e4                # max number of iters
     nout    = 200                # check frequency
@@ -60,6 +61,7 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
     Fchk    = zeros(Dat, nx  ,ny  )
     Pla     = zeros(Dat, nx  ,ny  )
     λ       = zeros(Dat, nx  ,ny  )
+    λ1      = zeros(Dat, nx  ,ny  )
     dQdTxx  = zeros(Dat, nx  ,ny  )
     dQdTyy  = zeros(Dat, nx  ,ny  )
     dQdTxy  = zeros(Dat, nx  ,ny  )
@@ -122,16 +124,17 @@ Dat = Float64  # Precision (double=Float64 or single=Float32)
             Pla    .= 0.0
             Pla    .= F .> 0.0
             λ      .= Pla.*F./(η_ve .+ η_reg .+ K.*dt.*sinϕ*sinψ)           
+            λ1     .= rel*λ .+ (1.0-rel).*λ1
             dQdTxx .= 0.5.*Txx./Tii
             dQdTyy .= 0.5.*Tyy./Tii
             dQdTxy .=      Txy./Tii
             # plastic corrections
-            Pt_c    .= Pt .+ λ.*K.*dt.*sinψ
-            Txx    .= 2.0.*η_ve.*(Exx1 .-      λ.*dQdTxx)
-            Tyy    .= 2.0.*η_ve.*(Eyy1 .-      λ.*dQdTyy)
-            Txy    .= 2.0.*η_ve.*(Exy1 .- 0.5.*λ.*dQdTxy)
+            Pt_c    .= Pt .+ λ1.*K.*dt.*sinψ
+            Txx    .= 2.0.*η_ve.*(Exx1 .-      λ1.*dQdTxx)
+            Tyy    .= 2.0.*η_ve.*(Eyy1 .-      λ1.*dQdTyy)
+            Txy    .= 2.0.*η_ve.*(Exy1 .- 0.5.*λ1.*dQdTxy)
             Tii    .= sqrt.(0.5*(Txx.^2 .+ Tyy.^2) .+ Txy.^2)
-            Fchk   .= Tii .- τ_y .- Pt_c.*sinϕ .- λ.*η_reg
+            Fchk   .= Tii .- τ_y .- Pt_c.*sinϕ .- λ1.*η_reg
             η_vep  .= Tii./2.0./Eii
             Txyv[2:end-1,2:end-1].=av(Txy) # Txyv=0 on boundaries !
             # PT timestep
