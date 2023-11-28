@@ -1,4 +1,7 @@
 # Concise 2D visco-elasto-plastic Stokes solver
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10212668.svg)](https://doi.org/10.5281/zenodo.10212668)
+
 Visco-elasto-plastic rheology for 2D Stokes solvers and continuum mechanics.
 
 ![](extras/Stokes2D_vep.gif)
